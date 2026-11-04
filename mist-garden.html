@@ -212,7 +212,18 @@ function newGame(){
 }
 const SAVE='mist-garden-save-v1';
 function save(){try{localStorage.setItem(SAVE,JSON.stringify({...G,x:P.x,y:P.y}))}catch(e){}}
-let saveT=0;function saveSoon(){clearTimeout(saveT);saveT=setTimeout(save,500)}
+// A fight is not saved until it ends, so quitting mid-fight cannot lose the crop or keep damage.
+let inFight=false;
+let saveT=0;function saveSoon(){clearTimeout(saveT);saveT=setTimeout(()=>{if(!inFight)save()},500)}
+function flushSave(){clearTimeout(saveT);if(G&&!inFight)save()}
+const BACKUPS=SAVE+'-backups',MAX_BACKUPS=3;
+function loadBackups(){try{const l=JSON.parse(localStorage.getItem(BACKUPS));return Array.isArray(l)?l:[]}catch(e){return[]}}
+function pushBackup(g){
+  try{
+    const copy=JSON.parse(JSON.stringify(g)),l=loadBackups().filter(b=>b.day!==copy.day);
+    localStorage.setItem(BACKUPS,JSON.stringify([copy,...l].slice(0,MAX_BACKUPS)));
+  }catch(e){}
+}
 function loadSave(){try{const s=localStorage.getItem(SAVE);return s?JSON.parse(s):null}catch(e){return null}}
 const CODE_PREFIX='MG1-';
 function exportCode(){return CODE_PREFIX+btoa(encodeURIComponent(JSON.stringify({...G,x:P.x,y:P.y})))}
@@ -452,6 +463,7 @@ function harvest(p,x,y){
   gainXP(1,true);renderStatus();mapHint();saveSoon();
 }
 async function encounter(p,kind,rare,x,y){
+  inFight=true;
   showPad(false);
   sfx.enc();shake=4;
   setMsg(`${CROPS[kind].name}ต้นนี้ดิ้นอยู่ในดิน!`);
@@ -459,6 +471,7 @@ async function encounter(p,kind,rare,x,y){
   await wait(800);
   G.plots[p.i].c=null;G.plots[p.i].g=0;G.plots[p.i].w=false;
   const res=await battle(kind,rare);
+  inFight=false;
   if(res==='win'||res==='boom'){saveSoon();return}
   const near=[];
   for(let b=p.b-1;b<=p.b+1;b++)for(let a=p.a-1;a<=p.a+1;a++){
@@ -482,7 +495,7 @@ async function nextDay(hpRatio=1){
   G.day++;
   for(const s of G.plots){if(s.c&&s.w&&s.g<CROPS[s.c].days)s.g++;s.w=false}
   G.hp=Math.max(1,Math.round(maxHP()*hpRatio));G.pw=maxPW();
-  save();renderStatus();
+  save();pushBackup({...G,x:P.x,y:P.y});renderStatus();
   await fadeTo(0,300);
   if(mist()>L0){await say(`หมอกหนาขึ้นเป็นระดับ ${mist()} ผักกลายพันธุ์ง่ายขึ้น และมอนสเตอร์ก็แรงขึ้น`)}
 }
@@ -779,12 +792,20 @@ async function titleScreen(){
     s=loadSave();
     setMsg('เลือกเมนูเพื่อเริ่มเล่น');
     $('#hint').textContent='คีย์บอร์ด: ลูกศรเลื่อน · Enter เลือก · X กลับ';
-    v=await choose([...(s?[{label:'เล่นต่อ',sub:`วันที่ ${s.day} · Lv ${s.lv} · ${s.gold} G`,value:'load'}]:[]),{label:'ใส่รหัสเซฟ',sub:'โหลดเซฟที่สำรองไว้',value:'code'},{label:'เริ่มฟาร์มใหม่',value:'new'},{label:'เริ่มที่วันที่ 19',sub:'Lv 5 · 400 G · ไว้เล่นต่อเมื่อเซฟหาย',value:'mid'}]);
+    v=await choose([...(s?[{label:'เล่นต่อ',sub:`วันที่ ${s.day} · Lv ${s.lv} · ${s.gold} G`,value:'load'}]:[]),...(loadBackups().length?[{label:'กู้เซฟสำรอง',sub:`เก็บอัตโนมัติ ${loadBackups().length} ชุด`,value:'restore'}]:[]),{label:'ใส่รหัสเซฟ',sub:'โหลดเซฟที่สำรองไว้',value:'code'},{label:'เริ่มฟาร์มใหม่',value:'new'},{label:'เริ่มที่วันที่ 19',sub:'Lv 5 · 400 G · ไว้เล่นต่อเมื่อเซฟหาย',value:'mid'}]);
     if(v==='load')return enter(s);
-    if(v==='code'){const g=await importPanel();if(g)return enter(g);continue}
+    if(v==='code'){const g=await importPanel();if(g){if(s)pushBackup(s);return enter(g)}continue}
+    if(v==='restore'){
+      setMsg('เลือกเช้าที่จะกลับไป เซฟปัจจุบันจะถูกเก็บเป็นเซฟสำรองแทน');
+      const b=await choose(loadBackups().map(g=>({label:`เช้าวันที่ ${g.day}`,sub:`Lv ${g.lv} · ${g.gold} G`,value:g})),{cancel:true});
+      if(!b)continue;
+      if(s)pushBackup(s);
+      return enter(b);
+    }
     if(s){
       setMsg(`เซฟวันที่ ${s.day} จะถูกทับ เริ่มใหม่จริงไหม?`);
       if(!await choose([{label:'ไม่ กลับไปก่อน',value:0},{label:'ทับเซฟเดิม',value:1}]))continue;
+      pushBackup(s);
     }
     break;
   }
@@ -955,6 +976,8 @@ $('#btnMenu').addEventListener('click',fieldMenu);
 function paintMute(){$('#mute').textContent=muted?'เสียง: ปิด':'เสียง: เปิด'}
 $('#mute').addEventListener('click',()=>{muted=!muted;try{localStorage.setItem('mg-mute',muted?'1':'0')}catch(e){}paintMute();$('#mute').blur();sfx.ok()});
 paintMute();
+addEventListener('pagehide',flushSave);
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')flushSave()});
 requestAnimationFrame(frame);
 titleScreen();
 </script>
