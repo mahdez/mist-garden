@@ -31,12 +31,18 @@ canvas:focus-visible{outline:2px solid var(--sprout);outline-offset:2px}
 .row small{color:var(--dim);font-size:13px}
 .bar{height:6px;background:#140d08;border:1px solid var(--groove)}
 .bar i{display:block;height:100%;transition:width .25s}
-.hp i{background:var(--hp)} .pw i{background:var(--pw)} .low i{background:var(--bad)}
+.hp i{background:var(--hp)} .pw i{background:var(--pw)} .st i{background:var(--sprout)} .low i{background:var(--bad)}
 .tags{display:flex;flex-wrap:wrap;gap:4px;font-size:13px}
 .tags:empty{display:none}
 .tags span{padding:0 7px;border:1px solid var(--groove);border-radius:9px;background:rgba(0,0,0,.2)}
 .tags .bad{border-color:var(--bad);color:var(--bad)}
 .tags .set{border-color:var(--sprout);color:var(--sprout)}
+.stats{display:flex;flex-wrap:wrap;gap:2px 12px;font-size:14px;color:var(--ink);font-variant-numeric:tabular-nums}
+.foe{display:grid;gap:4px;margin-top:4px;padding-top:7px;border-top:1px solid var(--groove)}
+.foe .row b{color:var(--bad)}
+#sheet{display:grid;grid-template-columns:auto minmax(0,1fr);gap:2px 14px;margin:0;font-variant-numeric:tabular-nums}
+#sheet dt{color:var(--dim)}
+#sheet dd{margin:0;text-align:right}
 #ctx{flex:1;padding:10px 12px;display:flex;flex-direction:column;gap:7px;min-height:150px;min-width:0}
 #who{color:var(--coin);font-size:14px}
 #who:empty{display:none}

@@ -5,7 +5,7 @@ let fxMap=[],floatsMap=[];
 function newGame(){
   const plots=[];for(let i=0;i<36;i++)plots.push({c:null,g:0,w:false});
   return {day:1,gold:40,shards:0,lv:1,xp:0,hp:40,pw:10,seeds:{carrot:6,tomato:0,pumpkin:0},veg:{carrot:0,tomato:0,pumpkin:0},
-    items:{},equip:{weapon:null,hat:null,shirt:null},fruits:{carrot:0,tomato:0,pumpkin:0},power:null,plots,land:0,sickle:0,can:0,harvests:0,pity:0,sel:'carrot',
+    stat:{hp:0,pw:0,atk:0,def:0,spd:0,sta:0},golden:0,points:0,stam:30,items:{},equip:{weapon:null,hat:null,shirt:null},fruits:{carrot:0,tomato:0,pumpkin:0},power:null,plots,land:0,sickle:0,can:0,harvests:0,pity:0,sel:'carrot',
     seen:{carrot:{n:0,rare:0},tomato:{n:0,rare:0},pumpkin:{n:0,rare:0}},x:4,y:5};
 }
 const SAVE='mist-garden-save-v1';
@@ -30,7 +30,7 @@ function importCode(text){
     const t=text.replace(/\s+/g,'');if(!t.startsWith(CODE_PREFIX))return null;
     const o=JSON.parse(decodeURIComponent(atob(t.slice(CODE_PREFIX.length))));
     if(!Number.isFinite(o.day)||!Number.isFinite(o.lv)||!Number.isFinite(o.gold)||!Array.isArray(o.plots)||o.plots.length!==36)return null;
-    const b=newGame(),g={...b,...o,seeds:{...b.seeds,...o.seeds},veg:{...b.veg,...o.veg},equip:{...b.equip,...o.equip},seen:{...b.seen,...o.seen},fruits:{...b.fruits,...o.fruits}};
+    const b=newGame(),g={...b,...o,stat:{...b.stat,...o.stat},points:o.points??(o.lv-1)*POINTS_PER_LEVEL,stam:o.stam,seeds:{...b.seeds,...o.seeds},veg:{...b.veg,...o.veg},equip:{...b.equip,...o.equip},seen:{...b.seen,...o.seen},fruits:{...b.fruits,...o.fruits}};
     if(blocked(g.x,g.y)){g.x=b.x;g.y=b.y}
     return g;
   }catch(e){return null}
@@ -44,9 +44,27 @@ function setCount(crop){return SLOTS.filter(s=>G.equip[s]&&itemCrop(G.equip[s])=
 const HEAL_BONUS=5;
 const lowestAtk=()=>Math.min(...Object.values(MONSTERS).map(m=>m.atk))*(1+.15*(mist()-1));
 const eatHeal=k=>Math.max(CROPS[k].eat,Math.round(lowestAtk())+HEAL_BONUS);
-const maxHP=()=>40+(G.lv-1)*8+gearBonus('hat');
-const maxPW=()=>10+(G.lv-1);
-const atkOf=()=>6+(G.lv-1)*1.5+G.sickle*2+gearBonus('weapon');
-const defOf=()=>3+(G.lv-1)*.8+gearBonus('shirt');
+const statPts=k=>(G.stat&&G.stat[k]||0)*STATS[k].per;
+const maxHP=()=>40+(G.lv-1)*4+gearBonus('hat')+statPts('hp');
+const maxPW=()=>10+(G.lv-1)+statPts('pw');
+const maxStam=()=>30+(G.lv-1)*2+statPts('sta');
+const atkOf=()=>6+(G.lv-1)*.5+G.sickle*2+gearBonus('weapon')+statPts('atk');
+const defOf=()=>3+gearBonus('shirt')+statPts('def');
+const spdOf=()=>6+(G.lv-1)*.25+statPts('spd');
+const hitChance=()=>setCount('carrot')>=3?1:.92;
+const critChance=()=>.08+(setCount('carrot')>=2?.15:0);
+// Older saves grew stats automatically, so they receive the points for every level already gained.
+function normalizeSave(g){
+  const upgraded=g.points===undefined;
+  g.stat={hp:0,pw:0,atk:0,def:0,spd:0,sta:0,...g.stat};
+  if(upgraded)g.points=(g.lv-1)*POINTS_PER_LEVEL;
+  if(g.stam===undefined)g.stam=30+(g.lv-1)*2;
+  g.golden=g.golden||0;
+  return upgraded;
+}
+function useStamina(n){
+  if(G.stam<n){note('SP หมดแล้ว เข้าบ้านไปนอนเพื่อฟื้น หรือกินผักในเมนู');sfx.back();return false}
+  G.stam-=n;renderStatus();return true;
+}
 const xpNext=()=>Math.floor(15*G.lv**1.5);
 

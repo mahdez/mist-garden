@@ -5,7 +5,7 @@ async function titleScreen(){
   setMsg('เลือกเมนูเพื่อเริ่มเล่น');
   $('#hint').textContent='คีย์บอร์ด: ลูกศรเลื่อน · Enter เลือก · X กลับ';
   let s,v;
-  const enter=g=>{setOver('');g.fruits={carrot:0,tomato:0,pumpkin:0,...g.fruits};g.power=g.power||null;G=g;Object.assign(P,{x:g.x,y:g.y,fx:g.x,fy:g.y,path:null,moving:false});save();renderStatus();mode='map';renderSeeds();showPad(true);note('กลับมาที่ฟาร์มแล้ว');mapHint()};
+  const enter=g=>{setOver('');g.fruits={carrot:0,tomato:0,pumpkin:0,...g.fruits};g.power=g.power||null;const upgraded=normalizeSave(g);G=g;Object.assign(P,{x:g.x,y:g.y,fx:g.x,fy:g.y,path:null,moving:false});save();renderStatus();mode='map';renderSeeds();showPad(true);note(upgraded?`อัปเดตใหม่! ได้แต้มสถานะ ${g.points} แต้ม อัปได้ที่ เมนู → สถานะ`:'กลับมาที่ฟาร์มแล้ว');mapHint()};
   for(;;){
     s=loadSave();
     setMsg('เลือกเมนูเพื่อเริ่มเล่น');
@@ -29,8 +29,8 @@ async function titleScreen(){
   }
   setOver('');
   if(v==='mid'){
-    const g=newGame();Object.assign(g,{day:19,lv:5,gold:400,land:1,harvests:40,seeds:{carrot:12,tomato:6,pumpkin:2}});
-    G=g;g.hp=maxHP();g.pw=maxPW();return enter(g);
+    const g=newGame();Object.assign(g,{points:12,day:19,lv:5,gold:400,land:1,harvests:40,seeds:{carrot:12,tomato:6,pumpkin:2}});
+    G=g;g.hp=maxHP();g.pw=maxPW();g.stam=maxStam();return enter(g);
   }
   G=newGame();Object.assign(P,{x:4,y:5,fx:4,fy:5,dir:'down',path:null,moving:false});renderStatus();
   mode='script';

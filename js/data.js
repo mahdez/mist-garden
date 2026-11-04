@@ -23,10 +23,22 @@ const itemCrop=id=>id.split('_')[0];
 const itemSlot=id=>id.split('_')[1];
 const itemName=id=>GEAR[itemCrop(id)][itemSlot(id)][0];
 const MONSTERS={
-  carrot:{name:'แครอทคลั่ง',hp:22,atk:7,def:1,spd:9,xp:8,gold:12},
+  carrot:{name:'แครอทคลั่ง',hp:22,atk:7,def:1,spd:8,xp:8,gold:12},
   tomato:{name:'มะเขือเทศระเบิด',hp:20,atk:8,def:1,spd:5,xp:14,gold:28},
   pumpkin:{name:'ฟักทองยักษ์',hp:55,atk:11,def:4,spd:3,xp:30,gold:60},
 };
+const POINTS_PER_LEVEL=3;
+const STATS={
+  hp:{name:'HP สูงสุด',per:6},
+  pw:{name:'MP',per:2},
+  atk:{name:'โจมตี',per:1},
+  def:{name:'ป้องกัน',per:1},
+  spd:{name:'ความเร็ว',per:.5},
+  sta:{name:'SP',per:5},
+};
+const STAMINA_COST={plant:1,water:1,harvest:1};
+const FOOD_STAMINA={carrot:2,tomato:1,pumpkin:6};
+const GOLDEN_VEG={name:'ผักทอง',drop:.2,rareDrop:1};
 const FRUITS={
   carrot:{name:'ผลปีศาจแครอท',skill:'ตาเหยี่ยว',pw:4,note:'ตีแรง 1.4 เท่า คริติคอลแน่นอน'},
   tomato:{name:'ผลปีศาจมะเขือเทศ',skill:'ระเบิดฉ่ำ',pw:5,note:'ตีแรง 3 เท่า เสีย HP 10%'},

@@ -18,7 +18,7 @@ function burst(x,y,col,n=14){if(CALM)n=5;for(let i=0;i<n;i++){const a=rand(0,TAU
 function pop(who,n,col='#ffffff'){const p=pos(who);bt.floats.push({x:p.x,y:p.y-28,t:0,n,col})}
 const log=async(t,ms=720)=>{setMsg(t);await wait(ms)};
 function hurtEnemy(d,col){
-  d=Math.max(1,Math.round(d));const e=bt.e;e.hp=Math.max(0,e.hp-d);bt.eflash=.22;bt.shake=2;pop('e',d);burst(e.px,e.py,col||'#fff',10);return d;
+  d=Math.max(1,Math.round(d));const e=bt.e;e.hp=Math.max(0,e.hp-d);bt.eflash=.22;bt.shake=2;pop('e',d);burst(e.px,e.py,col||'#fff',10);renderStatus();return d;
 }
 function hurtPlayer(d,col){
   d=Math.max(1,Math.round(d));
@@ -33,9 +33,9 @@ function tryStatus(name,turns){
 }
 function playerAttack(mult,sureCrit){
   const carrot=setCount('carrot');
-  const hit=carrot>=3?1:bt.status.blind>0?.55:.92;
+  const hit=carrot>=3?1:bt.status.blind>0?.55:hitChance();
   if(!sureCrit&&Math.random()>hit)return{miss:true};
-  const crit=sureCrit||Math.random()<.08+(carrot>=2?.15:0);
+  const crit=sureCrit||Math.random()<critChance();
   const d=(atkOf()*mult*rand(.92,1.08)-bt.e.def/2)*(crit?(carrot>=3?2:1.6):1);
   return{d,crit};
 }
@@ -48,16 +48,16 @@ async function playerTurn(){
   if(s.stun){s.stun=false;renderStatus();await log('ยังมึนงงอยู่ ขยับไม่ได้',760);return}
   renderStatus();
   for(;;){
-    setMsg('จะทำอะไรดี?',`เทิร์นที่ ${bt.round}`);
-    const cmd=await choose([{label:'โจมตี',value:'atk'},{label:'สกิล',value:'skill'},{label:'กินผัก',value:'eat',disabled:!CROP_IDS.some(k=>G.veg[k]>0)},{label:'ป้องกัน',value:'guard'},{label:'หนี',value:'flee'}],{cols:2});
+    setMsg('จะทำอะไรดี?',`เทิร์นที่ ${bt.round} · ${bt.first==='p'?'เราออกก่อน':`${bt.e.name}ออกก่อน`}`);
+    const cmd=await choose([{label:'โจมตี',value:'atk'},{label:'สกิล',value:'skill'},{label:'กินผัก',value:'eat',disabled:!eatList().length},{label:'ป้องกัน',value:'guard'},{label:'หนี',value:'flee'}],{cols:2});
     if(cmd==='atk'){
       bt.plunge=.25;const r=playerAttack(1);
       if(r.miss){sfx.miss();await log('ตีพลาด!',620);break}
       r.crit?sfx.crit():sfx.hit();setMsg(r.crit?'คริติคอล! โดนจุดสำคัญเต็ม ๆ':`โจมตี${bt.e.name}`);hurtEnemy(r.d);await wait(620);break;
     }
     if(cmd==='skill'){
-      setMsg(`ใช้สกิลอะไร? พลัง ${G.pw}/${maxPW()}`);
-      const sk=await choose([{label:'ฟันเต็มแรง',sub:'โจมตี 1.8 เท่า · พลัง 3',value:'slash',disabled:G.pw<3},{label:'ตั้งหลัก',sub:'ฟื้น HP 25% · พลัง 4',value:'rest',disabled:G.pw<4},...(G.power?[{label:FRUITS[G.power].skill,sub:`${FRUITS[G.power].note} · พลัง ${FRUITS[G.power].pw}`,value:'power',disabled:G.pw<FRUITS[G.power].pw}]:[])],{cancel:true});
+      setMsg(`ใช้สกิลอะไร? MP ${G.pw}/${maxPW()}`);
+      const sk=await choose([{label:'ฟันเต็มแรง',sub:'โจมตี 1.8 เท่า · MP 3',value:'slash',disabled:G.pw<3},{label:'ตั้งหลัก',sub:'ฟื้น HP 25% · MP 4',value:'rest',disabled:G.pw<4},...(G.power?[{label:FRUITS[G.power].skill,sub:`${FRUITS[G.power].note} · MP ${FRUITS[G.power].pw}`,value:'power',disabled:G.pw<FRUITS[G.power].pw}]:[])],{cancel:true});
       if(!sk)continue;
       if(sk==='power'){
         const f=FRUITS[G.power];G.pw-=f.pw;renderStatus();
@@ -79,9 +79,9 @@ async function playerTurn(){
     if(cmd==='eat'){
       setMsg(`กินอะไรดี? HP ${G.hp}/${maxHP()}`);
       const k=await choose(eatList(),{cancel:true});if(!k)continue;
-      const v=eatVeg(k);sfx.heal();pop('p','+'+v,'#7fd483');const p=pos('p');burst(p.x,p.y,'#7fd483',12);renderStatus();await log(`กิน${CROPS[k].name} ฟื้น HP ${v}`,620);break;
+      const v=eatVeg(k);sfx.heal();pop('p','+'+v,'#7fd483');const p=pos('p');burst(p.x,p.y,'#7fd483',12);renderStatus();await log(k==='golden'?`กิน${GOLDEN_VEG.name} ฟื้น HP MP SP เต็ม!`:`กิน${CROPS[k].name} ฟื้น HP ${v}`,620);break;
     }
-    if(cmd==='guard'){bt.guard=true;G.pw=Math.min(maxPW(),G.pw+1);renderStatus();await log('ตั้งท่าป้องกัน รับความเสียหายครึ่งเดียว และได้พลังคืน 1',620);break}
+    if(cmd==='guard'){bt.guard=true;G.pw=Math.min(maxPW(),G.pw+1);renderStatus();await log('ตั้งท่าป้องกัน รับความเสียหายครึ่งเดียว และได้ MP คืน 1',620);break}
     if(cmd==='flee'){
       if(Math.random()<.65){await log('หนีออกมาได้!',600);bt.fled=true;return}
       await log('หนีไม่พ้น!',600);break;
@@ -124,7 +124,8 @@ async function battle(kind,rare){
   await log(rare?`ร่างหายาก! ${e.name}โผล่ออกมาจากดิน!`:`${e.name}โผล่ออกมาจากดิน!`,800);
   let res=null;
   outer:for(;;){
-    const order=[{w:'p',s:6+rand(0,4)},{w:'e',s:e.charging?-99:e.spd+rand(0,4)}].sort((a,b)=>b.s-a.s);
+    const order=[{w:'p',s:spdOf()+rand(0,4)},{w:'e',s:e.charging?-99:e.spd+rand(0,4)}].sort((a,b)=>b.s-a.s);
+    bt.first=order[0].w;
     for(const o of order){
       if(o.w==='p')await playerTurn();else await enemyTurn();
       if(bt.fled){res='flee';break outer}
@@ -149,7 +150,14 @@ async function victory(e){
   const shards=e.rare?2:Math.random()<.25?1:0;G.shards+=shards;
   const up=gainXP(e.xp);renderStatus();
   await say(`ชนะแล้ว! ได้ ${e.xp} EXP และ ${e.gold} G${shards?` และเศษอุกกาบาต ${shards} ชิ้น`:''}`);
-  if(up)await say(`เลเวลอัปเป็น Lv ${G.lv}! HP และพลังฟื้นเต็ม`);
+  if(up){
+    setMsg(`เลเวลอัปเป็น Lv ${G.lv}! HP และ MP ฟื้นเต็ม ได้แต้มสถานะรวม ${G.points} แต้ม`);
+    if(await choose([{label:'อัปสถานะเลย',value:1},{label:'ไว้ทีหลัง',value:0}]))await allocMenu();
+  }
+  if(Math.random()<(e.rare?GOLDEN_VEG.rareDrop:GOLDEN_VEG.drop)){
+    G.golden++;
+    await say(`ได้รับ ${GOLDEN_VEG.name}! กินแล้วฟื้น HP MP SP เต็ม เก็บไว้ในเมนูกินผัก`,'ของดรอป');
+  }
   // Rarer than gear: 15% (50% from golden forms), guaranteed by the 10th win in a row without one.
   G.fruitMiss=G.fruitMiss||{};
   const fruitMissed=G.fruitMiss[e.kind]||0;

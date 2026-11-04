@@ -35,10 +35,12 @@ function act(x,y){
     const s=G.plots[p.i];
     if(!s.c){
       if(G.seeds[G.sel]<=0){note(`เมล็ด${CROPS[G.sel].name}หมด ไปซื้อที่ร้านได้`);sfx.back();return}
+      if(!useStamina(STAMINA_COST.plant))return;
       G.seeds[G.sel]--;s.c=G.sel;s.g=0;s.w=false;sfx.plant();burstMap(x,y,'#a4d96c',5);note(`ปลูก${CROPS[s.c].name}แล้ว อย่าลืมรดน้ำ`);renderSeeds();mapHint();saveSoon();return;
     }
-    if(s.g>=CROPS[s.c].days)return harvest(p,x,y);
+    if(s.g>=CROPS[s.c].days){if(!useStamina(STAMINA_COST.harvest))return;return harvest(p,x,y)}
     if(s.w){note(`${CROPS[s.c].name}รดน้ำแล้ว รอพรุ่งนี้`);return}
+    if(!useStamina(STAMINA_COST.water))return;
     waterAt(p);sfx.water();mapHint();saveSoon();return;
   }
   if(t==='D')return script(sleep);
@@ -112,7 +114,7 @@ async function nextDay(hpRatio=1){
   const L0=mist();
   G.day++;
   for(const s of G.plots){if(s.c&&s.w&&s.g<CROPS[s.c].days)s.g++;s.w=false}
-  G.hp=Math.max(1,Math.round(maxHP()*hpRatio));G.pw=maxPW();
+  G.hp=Math.max(1,Math.round(maxHP()*hpRatio));G.pw=maxPW();G.stam=Math.round(maxStam()*hpRatio);
   save();pushBackup({...G,x:P.x,y:P.y});renderStatus();
   await fadeTo(0,300);
   if(mist()>L0){await say(`หมอกหนาขึ้นเป็นระดับ ${mist()} ผักกลายพันธุ์ง่ายขึ้น และมอนสเตอร์ก็แรงขึ้น`)}
@@ -153,8 +155,8 @@ async function sell(){
 }
 function gainXP(n,quiet){
   G.xp+=n;let up=false;
-  while(G.xp>=xpNext()){G.xp-=xpNext();G.lv++;up=true;G.hp=maxHP();G.pw=maxPW()}
-  if(up){sfx.heal();if(quiet)note(`เลเวลอัปเป็น Lv ${G.lv}! HP และพลังฟื้นเต็ม`)}
+  while(G.xp>=xpNext()){G.xp-=xpNext();G.lv++;G.points+=POINTS_PER_LEVEL;up=true;G.hp=maxHP();G.pw=maxPW()}
+  if(up){sfx.heal();if(quiet)note(`เลเวลอัปเป็น Lv ${G.lv}! ได้แต้มสถานะ อัปได้ที่ เมนู → สถานะ`)}
   return up;
 }
 function fieldMenu(){
@@ -162,8 +164,9 @@ function fieldMenu(){
   script(async()=>{
     for(;;){
       setMsg('เมนู');
-      const a=await choose([{label:'ชุดและอาวุธ',value:'gear'},{label:'กินผัก',value:'eat'},{label:'ผลปีศาจ',value:'fruit'},{label:'สมุดผัก',value:'book'},{label:'สำรองเซฟ',value:'code'},{label:'เล่นต่อ',value:'close'}],{cols:2});
+      const a=await choose([{label:'สถานะ',value:'stats'},{label:'ชุดและอาวุธ',value:'gear'},{label:'กินผัก',value:'eat'},{label:'ผลปีศาจ',value:'fruit'},{label:'สมุดผัก',value:'book'},{label:'สำรองเซฟ',value:'code'},{label:'เล่นต่อ',value:'close'}],{cols:2});
       if(a==='close')return;
+      if(a==='stats')await statsMenu();
       if(a==='gear')await gearMenu();
       if(a==='eat')await eatMenu();
       if(a==='fruit')await fruitMenu();
@@ -196,14 +199,46 @@ async function importPanel(){
     sfx.back();setMsg('รหัสนี้ใช้ไม่ได้ ตรวจว่าคัดลอกมาครบและขึ้นต้นด้วย MG1-');
   }
 }
-function eatList(){return CROP_IDS.filter(k=>G.veg[k]>0).map(k=>({label:`${CROPS[k].name} × ${G.veg[k]}`,sub:`HP +${eatHeal(k)}`,value:k}))}
-function eatVeg(k){G.veg[k]--;const v=Math.min(eatHeal(k),maxHP()-G.hp);G.hp+=v;return v}
+function eatList(){return [...(G.golden>0?[{label:`${GOLDEN_VEG.name} × ${G.golden}`,sub:'ฟื้น HP MP SP เต็ม',value:'golden'}]:[]),...CROP_IDS.filter(k=>G.veg[k]>0).map(k=>({label:`${CROPS[k].name} × ${G.veg[k]}`,sub:`HP +${eatHeal(k)}`,value:k}))]}
+function eatVeg(k){
+  if(k==='golden'){G.golden--;const v=maxHP()-G.hp;G.hp=maxHP();G.pw=maxPW();G.stam=Math.max(G.stam,maxStam());return v}
+  G.veg[k]--;const v=Math.min(eatHeal(k),maxHP()-G.hp);G.hp+=v;return v}
 async function eatMenu(){
   for(;;){
     const l=eatList();if(!l.length){setMsg('ไม่มีผักในกระเป๋า');await wait(800);return}
-    setMsg(`กินอะไรดี? HP ${G.hp}/${maxHP()}`);
-    const v=await choose(l,{cancel:true});if(!v)return;
-    eatVeg(v);sfx.heal();renderStatus();saveSoon();
+    setMsg(`กินอะไรดี? HP ${G.hp}/${maxHP()} · MP ${G.pw}/${maxPW()} · SP ${G.stam}/${maxStam()}`);
+    const v=await choose(l.map(i=>i.value==='golden'?i:{...i,sub:`${i.sub} · SP +${FOOD_STAMINA[i.value]}`}),{cancel:true});if(!v)return;
+    eatVeg(v);if(v!=='golden')G.stam=Math.min(maxStam(),G.stam+FOOD_STAMINA[v]);sfx.heal();renderStatus();saveSoon();
+  }
+}
+async function allocMenu(){
+  const before={...G.stat},points=G.points;
+  for(;;){
+    setMsg(G.points?`แต้มเหลือ ${G.points} แต้ม เลือกสถานะที่อยากเพิ่ม`:'ใช้แต้มครบแล้ว กดยืนยันเพื่อบันทึก',`อัปสถานะ`);
+    const v=await choose([...Object.entries(STATS).map(([k,s])=>({label:`${s.name} +${s.per}`,sub:`ลงแล้ว ${G.stat[k]} แต้ม`,value:k,disabled:G.points<=0})),{label:'ยืนยัน',sub:'เปลี่ยนภายหลังไม่ได้',value:'ok',disabled:G.points===points}],{cancel:true});
+    if(v==='ok'){G.hp=Math.min(G.hp,maxHP());G.pw=Math.min(G.pw,maxPW());renderStatus();saveSoon();return}
+    if(v===null){G.stat=before;G.points=points;renderStatus();return}
+    const beforeHP=maxHP(),beforePW=maxPW(),beforeSta=maxStam();
+    G.stat[v]++;G.points--;
+    G.hp+=maxHP()-beforeHP;G.pw+=maxPW()-beforePW;G.stam+=maxStam()-beforeSta;
+    sfx.ok();renderStatus();
+  }
+}
+async function statsMenu(){
+  for(;;){
+  const sets=CROP_IDS.filter(k=>setCount(k)>=2).map(k=>`ชุด${CROPS[k].name} ${setCount(k)}/3`).join(', ')||'ยังไม่มี';
+  const rows=[['เลเวล',`${G.lv} (EXP ${G.xp}/${xpNext()})`],['HP',`${G.hp}/${maxHP()}`],['MP',`${G.pw}/${maxPW()}`],['SP',`${G.stam}/${maxStam()}`],
+    ['โจมตี',Math.round(atkOf())],['ป้องกัน',Math.round(defOf())],['ความเร็ว',spdOf()],
+    ['คริติคอล',`${Math.round(critChance()*100)}%`],['ความแม่นยำ',`${Math.round(hitChance()*100)}%`],
+    ['โบนัสชุด',sets],['พลังผลปีศาจ',G.power?FRUITS[G.power].skill:'ยังไม่มี']];
+  const box=$('#sheet');box.innerHTML='';
+  for(const[k,v]of rows){const dt=document.createElement('dt'),dd=document.createElement('dd');dt.textContent=k;dd.textContent=v;box.append(dt,dd)}
+  box.hidden=false;
+  setMsg(G.points?`มีแต้มสถานะ ${G.points} แต้ม พร้อมอัป`:'เลเวลอัปแต่ละครั้งได้ 3 แต้ม ความเร็วสูงจะออกก่อนมอนสเตอร์ได้บ่อยขึ้น','สถานะชาวนา');
+  const a=await choose([{label:'อัปสถานะ',sub:`${G.points} แต้ม`,value:'up',disabled:!G.points},{label:'กลับ',value:'back'}]);
+  box.hidden=true;box.innerHTML='';
+  if(a==='back')return;
+  await allocMenu();
   }
 }
 async function fruitMenu(){
