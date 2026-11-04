@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>สวนในหมอก</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Itim&family=Sriracha&display=swap">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<main id="game">
+  <div id="screen">
+    <canvas id="cv" width="320" height="240" tabindex="0" aria-label="หน้าจอฟาร์ม"></canvas>
+    <div id="over"></div>
+  </div>
+  <section id="panel">
+    <div id="status" class="board" aria-label="สถานะชาวนา"></div>
+    <div id="ctx" class="board" aria-live="polite">
+      <div id="who"></div>
+      <p id="msg"></p>
+      <p id="hint"></p>
+      <textarea id="savecode" hidden spellcheck="false" aria-label="รหัสเซฟ"></textarea>
+      <div id="seeds"></div>
+      <div id="menu"></div>
+    </div>
+    <div id="pad">
+      <div id="dpad">
+        <span></span><button data-d="up" aria-label="ขึ้น">▲</button><span></span>
+        <button data-d="left" aria-label="ซ้าย">◀</button><span></span><button data-d="right" aria-label="ขวา">▶</button>
+        <span></span><button data-d="down" aria-label="ลง">▼</button><span></span>
+      </div>
+      <div id="ab"><button id="btnMenu" type="button">เมนู</button><button id="btnAct" type="button">ทำงาน</button></div>
+    </div>
+    <div id="foot"><span id="info"></span><button id="mute" type="button">เสียง: เปิด</button></div>
+  </section>
+</main>
+<script src="js/core.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/data.js"></script>
+<script src="js/state.js"></script>
+<script src="js/art.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/farm.js"></script>
+<script src="js/battle.js"></script>
+<script src="js/title.js"></script>
+<script src="js/render.js"></script>
+<script src="js/input.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
