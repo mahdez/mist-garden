@@ -173,6 +173,11 @@ const MONSTERS={
   tomato:{name:'มะเขือเทศระเบิด',hp:20,atk:8,def:1,spd:5,xp:14,gold:28},
   pumpkin:{name:'ฟักทองยักษ์',hp:55,atk:11,def:4,spd:3,xp:30,gold:60},
 };
+const FRUITS={
+  carrot:{name:'ผลปีศาจแครอท',skill:'ตาเหยี่ยว',pw:4,note:'ตีแรง 1.4 เท่า คริติคอลแน่นอน'},
+  tomato:{name:'ผลปีศาจมะเขือเทศ',skill:'ระเบิดฉ่ำ',pw:5,note:'ตีแรง 3 เท่า เสีย HP 10%'},
+  pumpkin:{name:'ผลปีศาจฟักทอง',skill:'เปลือกเหล็ก',pw:4,note:'ป้องกันและสะท้อน 1.5 เท่าของการโจมตีครั้งถัดไป'},
+};
 const SPR={
   carrot:{pal:{k:'#3a1a08',o:'#f28a2c',d:'#c9651a',l:'#ffb45e',g:'#3fa34d',h:'#2a7a3a',w:'#ffffff',e:'#1a0a04'},gold:{o:'#ffd34a',d:'#c99a1f',l:'#fff0a0',g:'#c4a8f5',h:'#8d6fd0'},rows:[
     ".....g..g..g....","......g.g.g.....","......gghgg.....",".......ggg......",".....kkkkkk.....","....kooooook....","....kloooodk....","....koweoweok...","....koooooodk...","....kookkkodk...",".....koooodk....",".....kloodk.....","......koodk.....","......kodk......",".......kk......."]},
@@ -207,7 +212,7 @@ let fxMap=[],floatsMap=[];
 function newGame(){
   const plots=[];for(let i=0;i<36;i++)plots.push({c:null,g:0,w:false});
   return {day:1,gold:40,shards:0,lv:1,xp:0,hp:40,pw:10,seeds:{carrot:6,tomato:0,pumpkin:0},veg:{carrot:0,tomato:0,pumpkin:0},
-    items:{},equip:{weapon:null,hat:null,shirt:null},plots,land:0,sickle:0,can:0,harvests:0,pity:0,sel:'carrot',
+    items:{},equip:{weapon:null,hat:null,shirt:null},fruits:{carrot:0,tomato:0,pumpkin:0},power:null,plots,land:0,sickle:0,can:0,harvests:0,pity:0,sel:'carrot',
     seen:{carrot:{n:0,rare:0},tomato:{n:0,rare:0},pumpkin:{n:0,rare:0}},x:4,y:5};
 }
 const SAVE='mist-garden-save-v1';
@@ -232,7 +237,7 @@ function importCode(text){
     const t=text.replace(/\s+/g,'');if(!t.startsWith(CODE_PREFIX))return null;
     const o=JSON.parse(decodeURIComponent(atob(t.slice(CODE_PREFIX.length))));
     if(!Number.isFinite(o.day)||!Number.isFinite(o.lv)||!Number.isFinite(o.gold)||!Array.isArray(o.plots)||o.plots.length!==36)return null;
-    const b=newGame(),g={...b,...o,seeds:{...b.seeds,...o.seeds},veg:{...b.veg,...o.veg},equip:{...b.equip,...o.equip},seen:{...b.seen,...o.seen}};
+    const b=newGame(),g={...b,...o,seeds:{...b.seeds,...o.seeds},veg:{...b.veg,...o.veg},equip:{...b.equip,...o.equip},seen:{...b.seen,...o.seen},fruits:{...b.fruits,...o.fruits}};
     if(blocked(g.x,g.y)){g.x=b.x;g.y=b.y}
     return g;
   }catch(e){return null}
@@ -242,6 +247,10 @@ const landSize=()=>4+G.land;
 const plotAt=(x,y)=>{const a=x-PX,b=y-PY;return a>=0&&b>=0&&a<6&&b<6?{i:b*6+a,a,b,unlocked:a<landSize()&&b<landSize()}:null};
 function gearBonus(slot){const id=G.equip[slot];if(!id)return 0;const base=GEAR[itemCrop(id)][slot][1],lv=G.items[id]||1;return base+(lv-1)*(slot==='hat'?3:1)}
 function setCount(crop){return SLOTS.filter(s=>G.equip[s]&&itemCrop(G.equip[s])===crop).length}
+// Food always heals at least the weakest monster's current attack + 5, so eating stays worth a turn as mist rises.
+const HEAL_BONUS=5;
+const lowestAtk=()=>Math.min(...Object.values(MONSTERS).map(m=>m.atk))*(1+.15*(mist()-1));
+const eatHeal=k=>Math.max(CROPS[k].eat,Math.round(lowestAtk())+HEAL_BONUS);
 const maxHP=()=>40+(G.lv-1)*8+gearBonus('hat');
 const maxPW=()=>10+(G.lv-1);
 const atkOf=()=>6+(G.lv-1)*1.5+G.sickle*2+gearBonus('weapon');
@@ -341,7 +350,8 @@ function drawNum(t,x,y,col,sc=2){
 function statusTags(){
   const out=[];
   for(const k of CROP_IDS){const n=setCount(k);if(n>=2)out.push(`<span class="set">ชุด${CROPS[k].name} ${n}/3: ${n===3?CROPS[k].set3:CROPS[k].set2}</span>`)}
-  if(bt){const s=bt.status;if(s.poison>0)out.push(`<span class="bad">ติดพิษ ${s.poison} เทิร์น</span>`);if(s.blind>0)out.push(`<span class="bad">ตาพร่า ${s.blind} เทิร์น</span>`);if(s.stun)out.push('<span class="bad">มึนงง</span>');if(bt.guard)out.push('<span>ป้องกัน</span>')}
+  if(G.power)out.push(`<span>พลัง: ${FRUITS[G.power].skill}</span>`);
+  if(bt){const s=bt.status;if(s.poison>0)out.push(`<span class="bad">ติดพิษ ${s.poison} เทิร์น</span>`);if(s.blind>0)out.push(`<span class="bad">ตาพร่า ${s.blind} เทิร์น</span>`);if(s.stun)out.push('<span class="bad">มึนงง</span>');if(bt.guard)out.push('<span>ป้องกัน</span>');if(bt.reflect)out.push('<span>สะท้อน</span>')}
   return out.join('');
 }
 function renderStatus(){
@@ -552,10 +562,11 @@ function fieldMenu(){
   script(async()=>{
     for(;;){
       setMsg('เมนู');
-      const a=await choose([{label:'ชุดและอาวุธ',value:'gear'},{label:'กินผัก',value:'eat'},{label:'สมุดผัก',value:'book'},{label:'สำรองเซฟ',value:'code'},{label:'เล่นต่อ',value:'close'}],{cols:2});
+      const a=await choose([{label:'ชุดและอาวุธ',value:'gear'},{label:'กินผัก',value:'eat'},{label:'ผลปีศาจ',value:'fruit'},{label:'สมุดผัก',value:'book'},{label:'สำรองเซฟ',value:'code'},{label:'เล่นต่อ',value:'close'}],{cols:2});
       if(a==='close')return;
       if(a==='gear')await gearMenu();
       if(a==='eat')await eatMenu();
+      if(a==='fruit')await fruitMenu();
       if(a==='book')await bookMenu();
       if(a==='code')await backupPanel();
     }
@@ -585,8 +596,8 @@ async function importPanel(){
     sfx.back();setMsg('รหัสนี้ใช้ไม่ได้ ตรวจว่าคัดลอกมาครบและขึ้นต้นด้วย MG1-');
   }
 }
-function eatList(){return CROP_IDS.filter(k=>G.veg[k]>0).map(k=>({label:`${CROPS[k].name} × ${G.veg[k]}`,sub:`HP +${CROPS[k].eat}`,value:k}))}
-function eatVeg(k){G.veg[k]--;const v=Math.min(CROPS[k].eat,maxHP()-G.hp);G.hp+=v;return v}
+function eatList(){return CROP_IDS.filter(k=>G.veg[k]>0).map(k=>({label:`${CROPS[k].name} × ${G.veg[k]}`,sub:`HP +${eatHeal(k)}`,value:k}))}
+function eatVeg(k){G.veg[k]--;const v=Math.min(eatHeal(k),maxHP()-G.hp);G.hp+=v;return v}
 async function eatMenu(){
   for(;;){
     const l=eatList();if(!l.length){setMsg('ไม่มีผักในกระเป๋า');await wait(800);return}
@@ -594,6 +605,15 @@ async function eatMenu(){
     const v=await choose(l,{cancel:true});if(!v)return;
     eatVeg(v);sfx.heal();renderStatus();saveSoon();
   }
+}
+async function fruitMenu(){
+  const have=CROP_IDS.filter(k=>G.fruits[k]>0);
+  if(!have.length){setMsg('ยังไม่มีผลปีศาจ ปราบมอนสเตอร์เพื่อรับผลปีศาจ');await wait(1100);return}
+  setMsg(G.power?`พลังตอนนี้: ${FRUITS[G.power].skill} ถ้ากินผลใหม่ พลังเดิมจะหายไป`:'กินผลปีศาจเพื่อรับสกิลพิเศษ ใช้ได้ในการต่อสู้');
+  const v=await choose(have.map(k=>({label:`${FRUITS[k].name} × ${G.fruits[k]}`,sub:G.power===k?'กินอยู่':`${FRUITS[k].skill}: ${FRUITS[k].note}`,value:k,disabled:G.power===k})),{cancel:true});
+  if(!v)return;
+  G.fruits[v]--;G.power=v;sfx.heal();renderStatus();saveSoon();
+  await say(`ได้พลังใหม่! ใช้สกิล ${FRUITS[v].skill} ได้ในเมนูสกิล จนกว่าจะกินผลปีศาจอื่น`);
 }
 async function gearMenu(){
   for(;;){
@@ -646,7 +666,9 @@ function hurtEnemy(d,col){
   d=Math.max(1,Math.round(d));const e=bt.e;e.hp=Math.max(0,e.hp-d);bt.eflash=.22;bt.shake=2;pop('e',d);burst(e.px,e.py,col||'#fff',10);return d;
 }
 function hurtPlayer(d,col){
-  d=Math.max(1,Math.round(d));if(bt.guard)d=Math.max(1,Math.round(d/2));
+  d=Math.max(1,Math.round(d));
+  if(bt.reflect){bt.reflect=false;hurtEnemy(d*1.5,'#ffcf6b')}
+  if(bt.guard)d=Math.max(1,Math.round(d/2));
   G.hp=Math.max(0,G.hp-d);bt.pflash=.22;bt.shake=CALM?0:4;pop('p',d);const p=pos('p');burst(p.x,p.y,col||'#fff',10);renderStatus();return d;
 }
 function tryStatus(name,turns){
@@ -654,16 +676,16 @@ function tryStatus(name,turns){
   if(n>=3||(n===2&&Math.random()<.5)){return false}
   bt.status[name]=turns;renderStatus();return true;
 }
-function playerAttack(mult){
+function playerAttack(mult,sureCrit){
   const carrot=setCount('carrot');
   const hit=carrot>=3?1:bt.status.blind>0?.55:.92;
-  if(Math.random()>hit)return{miss:true};
-  const crit=Math.random()<.08+(carrot>=2?.15:0);
+  if(!sureCrit&&Math.random()>hit)return{miss:true};
+  const crit=sureCrit||Math.random()<.08+(carrot>=2?.15:0);
   const d=(atkOf()*mult*rand(.92,1.08)-bt.e.def/2)*(crit?(carrot>=3?2:1.6):1);
   return{d,crit};
 }
 async function playerTurn(){
-  const s=bt.status;bt.guard=false;bt.active='p';renderStatus();
+  const s=bt.status;bt.guard=false;bt.reflect=false;bt.active='p';renderStatus();
   const tomato=setCount('tomato');
   if(tomato>=2&&G.hp<maxHP()){const v=Math.min(tomato>=3?4:2,maxHP()-G.hp);G.hp+=v;pop('p','+'+v,'#7fd483');renderStatus();await wait(300)}
   if(s.poison>0){s.poison--;const d=Math.max(1,Math.round(maxHP()*.06));G.hp=Math.max(0,G.hp-d);bt.pflash=.22;pop('p',d,'#c98cff');renderStatus();await log('พิษเริ่มออกฤทธิ์',520);if(G.hp<=0)return}
@@ -680,8 +702,18 @@ async function playerTurn(){
     }
     if(cmd==='skill'){
       setMsg(`ใช้สกิลอะไร? พลัง ${G.pw}/${maxPW()}`);
-      const sk=await choose([{label:'ฟันเต็มแรง',sub:'โจมตี 1.8 เท่า · พลัง 3',value:'slash',disabled:G.pw<3},{label:'ตั้งหลัก',sub:'ฟื้น HP 25% · พลัง 4',value:'rest',disabled:G.pw<4}],{cancel:true});
+      const sk=await choose([{label:'ฟันเต็มแรง',sub:'โจมตี 1.8 เท่า · พลัง 3',value:'slash',disabled:G.pw<3},{label:'ตั้งหลัก',sub:'ฟื้น HP 25% · พลัง 4',value:'rest',disabled:G.pw<4},...(G.power?[{label:FRUITS[G.power].skill,sub:`${FRUITS[G.power].note} · พลัง ${FRUITS[G.power].pw}`,value:'power',disabled:G.pw<FRUITS[G.power].pw}]:[])],{cancel:true});
       if(!sk)continue;
+      if(sk==='power'){
+        const f=FRUITS[G.power];G.pw-=f.pw;renderStatus();
+        if(G.power==='pumpkin'){bt.guard=true;bt.reflect=true;sfx.ok();renderStatus();await log(`${f.skill}! รับความเสียหายครึ่งเดียว และสะท้อนการโจมตีครั้งถัดไป`,760);break}
+        bt.plunge=.25;sfx.crit();
+        if(G.power==='carrot'){setMsg(`${f.skill}! เล็งเข้าจุดสำคัญ`);hurtEnemy(playerAttack(1.4,true).d,'#ffcf6b');await wait(640);break}
+        const r=playerAttack(3);
+        if(r.miss){await log(`${f.skill}พลาด!`,620);break}
+        setMsg(`${f.skill}! ระเบิดใส่เต็ม ๆ แต่ตัวเองก็เจ็บ`);hurtEnemy(r.d,'#ff8a70');
+        G.hp=Math.max(1,G.hp-Math.round(maxHP()*.1));bt.pflash=.22;renderStatus();await wait(700);break;
+      }
       if(sk==='slash'){
         G.pw-=3;renderStatus();bt.plunge=.25;const r=playerAttack(1.8);
         if(r.miss){sfx.miss();await log('ฟันพลาด!',620);break}
@@ -731,7 +763,7 @@ async function battle(kind,rare){
   const L=mist(),m=MONSTERS[kind],sc=(1+.15*(L-1))*(rare?1.5:1);
   await fadeTo(1,160);
   const e={kind,rare,name:(rare?`${CROPS[kind].name}ทองคำ`:m.name),maxhp:Math.round(m.hp*sc),hp:Math.round(m.hp*sc),atk:m.atk*sc,def:m.def*sc,spd:m.spd,xp:Math.round(m.xp*sc*(rare?2:1)),gold:Math.round(m.gold*sc*(rare?2:1)),px:92,py:122,turns:0,charging:false};
-  bt={e,fx:[],floats:[],round:1,active:null,shake:0,eflash:0,pflash:0,elunge:0,plunge:0,fled:false,boom:false,guard:false,status:{poison:0,blind:0,stun:false}};
+  bt={e,fx:[],floats:[],round:1,active:null,shake:0,eflash:0,pflash:0,elunge:0,plunge:0,fled:false,boom:false,guard:false,reflect:false,status:{poison:0,blind:0,stun:false}};
   mode='battle';renderSeeds();renderStatus();
   await fadeTo(0,160);
   await log(rare?`ร่างหายาก! ${e.name}โผล่ออกมาจากดิน!`:`${e.name}โผล่ออกมาจากดิน!`,800);
@@ -763,6 +795,13 @@ async function victory(e){
   const up=gainXP(e.xp);renderStatus();
   await say(`ชนะแล้ว! ได้ ${e.xp} EXP และ ${e.gold} G${shards?` และเศษอุกกาบาต ${shards} ชิ้น`:''}`);
   if(up)await say(`เลเวลอัปเป็น Lv ${G.lv}! HP และพลังฟื้นเต็ม`);
+  // Rarer than gear: 15% (50% from golden forms), guaranteed by the 10th win in a row without one.
+  G.fruitMiss=G.fruitMiss||{};
+  const fruitMissed=G.fruitMiss[e.kind]||0;
+  if(fruitMissed>=9||Math.random()<(e.rare?.5:.15)){
+    G.fruitMiss[e.kind]=0;G.fruits[e.kind]++;
+    await say(`ได้รับ ${FRUITS[e.kind].name}! ของหายาก กินได้ที่ เมนู → ผลปีศาจ`,'ของดรอป');
+  }else G.fruitMiss[e.kind]=fruitMissed+1;
   // First win per crop always drops; after that 50%, guaranteed by the third win in a row without one.
   G.dropMiss=G.dropMiss||{};
   const missed=G.dropMiss[e.kind]||0,owned=SLOTS.some(s=>G.items[itemId(e.kind,s)]);
@@ -795,7 +834,7 @@ async function titleScreen(){
   setMsg('เลือกเมนูเพื่อเริ่มเล่น');
   $('#hint').textContent='คีย์บอร์ด: ลูกศรเลื่อน · Enter เลือก · X กลับ';
   let s,v;
-  const enter=g=>{setOver('');G=g;Object.assign(P,{x:g.x,y:g.y,fx:g.x,fy:g.y,path:null,moving:false});save();renderStatus();mode='map';renderSeeds();showPad(true);note('กลับมาที่ฟาร์มแล้ว');mapHint()};
+  const enter=g=>{setOver('');g.fruits={carrot:0,tomato:0,pumpkin:0,...g.fruits};g.power=g.power||null;G=g;Object.assign(P,{x:g.x,y:g.y,fx:g.x,fy:g.y,path:null,moving:false});save();renderStatus();mode='map';renderSeeds();showPad(true);note('กลับมาที่ฟาร์มแล้ว');mapHint()};
   for(;;){
     s=loadSave();
     setMsg('เลือกเมนูเพื่อเริ่มเล่น');
