@@ -31,11 +31,22 @@ const POINTS_PER_LEVEL=3;
 const STATS={
   hp:{name:'HP สูงสุด',per:6},
   pw:{name:'MP',per:2},
-  atk:{name:'โจมตี',per:1},
+  atk:{name:'STR (โจมตี)',per:1},
   def:{name:'ป้องกัน',per:1},
   spd:{name:'ความเร็ว',per:.5},
   sta:{name:'SP',per:5},
 };
+// Each stat unlocks a special ability at these invested point totals.
+const PERKS={
+  atk:[{at:5,name:'แรงบ้าคลั่ง',note:'ทำงาน 2 ช่องต่อ 1 SP'},{at:10,name:'คลั่งสุดขีด',note:'ทำงาน 3 ช่องต่อ 1 SP'}],
+  def:[{at:5,name:'กำบังสวน',note:'ถ้าแพ้ ผักรอบข้างเสียไม่เกิน 1 ต้น'},{at:10,name:'ป้อมปราการสวน',note:'ถ้าแพ้ ผักรอบข้างไม่เสียเลย'}],
+  hp:[{at:5,name:'ฟื้นตัวไว',note:'สลบแล้วตื่นมา HP และ SP เต็ม'},{at:10,name:'ท้องเหล็ก',note:'กินผักฟื้น HP เพิ่ม 50%'}],
+  pw:[{at:5,name:'สัมผัสธรรมชาติ',note:'ผักที่รดน้ำ 20% โตเพิ่มอีกวัน'},{at:10,name:'ลมหายใจผืนดิน',note:'ผักที่รดน้ำ 40% โตเพิ่มอีกวัน'}],
+  spd:[{at:5,name:'เท้าไว',note:'เดินเร็วขึ้น และออกก่อนเสมอในเทิร์นแรก'},{at:10,name:'มือไว',note:'20% ทำงานโดยไม่ใช้ SP'}],
+  sta:[{at:5,name:'มือเก๋า',note:'10% ได้ผลผลิตเพิ่ม 1'},{at:10,name:'เกษตรกรเซียน',note:'20% ได้ผลผลิตเพิ่ม 1'}],
+};
+// Speed points also add battle chances per point invested.
+const SPD_DOUBLE_PER_POINT=.04,SPD_DODGE_PER_POINT=.03;
 const STAMINA_COST={plant:1,water:1,harvest:1};
 const FOOD_STAMINA={carrot:2,tomato:1,pumpkin:6};
 const GOLDEN_VEG={name:'ผักทอง',drop:.2,rareDrop:1};

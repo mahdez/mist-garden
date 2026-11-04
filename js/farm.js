@@ -8,7 +8,9 @@ function describe(x,y){
   if(p){
     if(!p.unlocked)return 'ที่ดินยังไม่ได้ซื้อ ซื้อเพิ่มได้ที่ร้าน';
     const s=G.plots[p.i];if(!s.c)return G.seeds[G.sel]>0?`Enter: ปลูก${CROPS[G.sel].name}`:`เมล็ด${CROPS[G.sel].name}หมด ซื้อได้ที่ร้าน`;
-    const k=CROPS[s.c];if(s.g>=k.days)return `Enter: เก็บเกี่ยว${k.name}`;
+    const k=CROPS[s.c];
+    if(s.mutant)return `Enter: กลับไปสู้${s.mutant==='rare'?`${k.name}ทองคำ`:MONSTERS[s.c].name}`;
+    if(s.g>=k.days)return `Enter: เก็บเกี่ยว${k.name}`;
     return s.w?`${k.name} รดน้ำแล้ว อีก ${k.days-s.g} วันจะโต`:`Enter: รดน้ำ${k.name}`;
   }
   if(t==='D')return 'Enter: เข้านอน ไปวันถัดไป';
@@ -36,12 +38,12 @@ function act(x,y){
     if(!s.c){
       if(G.seeds[G.sel]<=0){note(`เมล็ด${CROPS[G.sel].name}หมด ไปซื้อที่ร้านได้`);sfx.back();return}
       if(!useStamina(STAMINA_COST.plant))return;
-      G.seeds[G.sel]--;s.c=G.sel;s.g=0;s.w=false;sfx.plant();burstMap(x,y,'#a4d96c',5);note(`ปลูก${CROPS[s.c].name}แล้ว อย่าลืมรดน้ำ`);renderSeeds();mapHint();saveSoon();return;
+      G.seeds[G.sel]--;s.c=G.sel;s.g=0;s.w=false;sfx.plant();burstMap(x,y,'#a4d96c',5);note(`ปลูก${CROPS[s.c].name}แล้ว อย่าลืมรดน้ำ`);extraWork('plant',x,y);renderSeeds();mapHint();saveSoon();return;
     }
-    if(s.g>=CROPS[s.c].days){if(!useStamina(STAMINA_COST.harvest))return;return harvest(p,x,y)}
+    if(s.g>=CROPS[s.c].days){if(!useStamina(STAMINA_COST.harvest))return;harvest(p,x,y);extraWork('harvest',x,y);return}
     if(s.w){note(`${CROPS[s.c].name}รดน้ำแล้ว รอพรุ่งนี้`);return}
     if(!useStamina(STAMINA_COST.water))return;
-    waterAt(p);sfx.water();mapHint();saveSoon();return;
+    waterAt(p);sfx.water();extraWork('water',x,y);mapHint();saveSoon();return;
   }
   if(t==='D')return script(sleep);
   if(t==='a'||t==='c')return script(shop);
@@ -49,6 +51,28 @@ function act(x,y){
   if(t==='M')return script(()=>say('อุกกาบาตลูกนี้ตกลงมาพร้อมกับลูกอื่นทั่วโลก หมอกสีม่วงยังซึมออกมาไม่หยุด'));
   if(t==='o')return script(()=>say('น้ำในบ่อยังใสดี ที่นี่ปลอดภัยจากหมอกอยู่ แค่ยังไม่รู้ว่าจะอีกนานแค่ไหน'));
   if(t==='~')return script(()=>say('บ่อปลาว่างเปล่า ไว้วันหลังค่อยปล่อยปลาลงไป'));
+}
+// STR perk: the same job carries on to the next plots in the direction the farmer faces, for no extra SP.
+function extraWork(kind,x,y){
+  const[dx,dy]=DIRS[P.dir],tier=perkTier('atk');
+  let done=0;
+  for(let i=1;i<=tier&&mode==='map';i++){
+    const tx=x+dx*i,ty=y+dy*i,p=plotAt(tx,ty);
+    if(!p||!p.unlocked)break;
+    const s=G.plots[p.i];
+    if(kind==='plant'){
+      if(s.c||G.seeds[G.sel]<=0)break;
+      G.seeds[G.sel]--;s.c=G.sel;s.g=0;s.w=false;burstMap(tx,ty,'#a4d96c',5);
+    }else if(kind==='water'){
+      if(!s.c||s.w||s.g>=CROPS[s.c].days)break;
+      waterAt(p);
+    }else{
+      if(!s.c||s.g<CROPS[s.c].days)break;
+      harvest(p,tx,ty);
+    }
+    done++;
+  }
+  if(done&&mode==='map')note(`แรงบ้าคลั่ง! ทำเพิ่มอีก ${done} ช่องโดยไม่ใช้ SP`);
 }
 function waterAt(p){
   const range=G.can?1:0;
@@ -59,12 +83,14 @@ function waterAt(p){
   note(range?'รดน้ำรอบ ๆ เรียบร้อย':'รดน้ำเรียบร้อย');
 }
 function rollYield(kind){
+  const bonus=Math.random()<[0,.1,.2][perkTier('sta')]?1:0;
   let r=Math.random();
-  for(const[n,chance]of CROPS[kind].extra){if(r<chance)return n;r-=chance}
-  return CROPS[kind].base;
+  for(const[n,chance]of CROPS[kind].extra){if(r<chance)return n+bonus;r-=chance}
+  return CROPS[kind].base+bonus;
 }
 function harvest(p,x,y){
   const s=G.plots[p.i],kind=s.c;
+  if(s.mutant)return script(()=>encounter(p,kind,s.mutant==='rare',x,y));
   const safe=G.harvests<2;
   const chance=safe?0:Math.min(.45,.10+.015*(mist()-1)+G.pity*.015);
   G.harvests++;
@@ -89,9 +115,14 @@ async function encounter(p,kind,rare,x,y){
   setMsg(`${CROPS[kind].name}ต้นนี้ดิ้นอยู่ในดิน!`);
   plotShake={i:p.i,t:.8};
   await wait(800);
-  G.plots[p.i].c=null;G.plots[p.i].g=0;G.plots[p.i].w=false;
+  G.plots[p.i]={c:null,g:0,w:false};
   const res=await battle(kind,rare);
   inFight=false;
+  if(res==='retreat'){
+    // The revealed monster stays in this plot, unchanged, until the player comes back.
+    G.plots[p.i]={c:kind,g:CROPS[kind].days,w:false,mutant:rare?'rare':'normal'};
+    note(`ถอยออกมาได้ มอนสเตอร์ยังรออยู่ในแปลง ${p.a+1},${p.b+1}`);saveSoon();return;
+  }
   if(res==='win'||res==='boom'){saveSoon();return}
   const near=[];
   for(let b=p.b-1;b<=p.b+1;b++)for(let a=p.a-1;a<=p.a+1;a++){
@@ -99,12 +130,10 @@ async function encounter(p,kind,rare,x,y){
     if(G.plots[b*6+a].c)near.push(b*6+a);
   }
   near.sort(()=>Math.random()-.5);
-  const gone=near.slice(0,3);gone.forEach(i=>{G.plots[i]={c:null,g:0,w:false}});
+  const gone=near.slice(0,[3,1,0][perkTier('def')]);gone.forEach(i=>{G.plots[i]={c:null,g:0,w:false}});
   if(res==='lose'){
     await say(gone.length?`มอนสเตอร์ทำลายผักข้าง ๆ ไป ${gone.length} ต้น แล้วหายเข้าไปในหมอก เราสลบไปจนเช้า`:'มอนสเตอร์หายเข้าไปในหมอก เราสลบไปจนเช้า');
-    await nextDay(.5);
-  }else{
-    await say(gone.length?`มอนสเตอร์ทำลายผักข้าง ๆ ไป ${gone.length} ต้นก่อนหายไป`:'มอนสเตอร์หายเข้าไปในหมอก ผักรอบข้างยังปลอดภัย');
+    await nextDay(perkTier('hp')>=1?1:.5);
   }
   saveSoon();
 }
@@ -113,7 +142,11 @@ async function nextDay(hpRatio=1){
   await fadeTo(1,300);
   const L0=mist();
   G.day++;
-  for(const s of G.plots){if(s.c&&s.w&&s.g<CROPS[s.c].days)s.g++;s.w=false}
+  const growChance=[0,.2,.4][perkTier('pw')];
+  for(const s of G.plots){
+    if(s.c&&s.w&&s.g<CROPS[s.c].days){s.g++;if(s.g<CROPS[s.c].days&&Math.random()<growChance)s.g++}
+    s.w=false;
+  }
   G.hp=Math.max(1,Math.round(maxHP()*hpRatio));G.pw=maxPW();G.stam=Math.round(maxStam()*hpRatio);
   save();pushBackup({...G,x:P.x,y:P.y});renderStatus();
   await fadeTo(0,300);
@@ -211,15 +244,23 @@ async function eatMenu(){
     eatVeg(v);if(v!=='golden')G.stam=Math.min(maxStam(),G.stam+FOOD_STAMINA[v]);sfx.heal();renderStatus();saveSoon();
   }
 }
+function perkNext(k){
+  const n=PERKS[k].find(p=>G.stat[k]<p.at);
+  if(k==='spd'&&!n)return `ลงแล้ว ${G.stat[k]} · เบิ้ล +4% หลบ +3% ต่อแต้ม`;
+  if(k==='spd')return `ลงแล้ว ${G.stat[k]} · เบิ้ล +4% หลบ +3% · ครบ ${n.at}: ${n.note}`;
+  return n?`ลงแล้ว ${G.stat[k]} · ครบ ${n.at}: ${n.note}`:`ลงแล้ว ${G.stat[k]} · ปลดล็อกครบแล้ว`;
+}
 async function allocMenu(){
   const before={...G.stat},points=G.points;
   for(;;){
     setMsg(G.points?`แต้มเหลือ ${G.points} แต้ม เลือกสถานะที่อยากเพิ่ม`:'ใช้แต้มครบแล้ว กดยืนยันเพื่อบันทึก',`อัปสถานะ`);
-    const v=await choose([...Object.entries(STATS).map(([k,s])=>({label:`${s.name} +${s.per}`,sub:`ลงแล้ว ${G.stat[k]} แต้ม`,value:k,disabled:G.points<=0})),{label:'ยืนยัน',sub:'เปลี่ยนภายหลังไม่ได้',value:'ok',disabled:G.points===points}],{cancel:true});
+    const v=await choose([...Object.entries(STATS).map(([k,s])=>({label:`${s.name} +${s.per}`,sub:perkNext(k),value:k,disabled:G.points<=0})),{label:'ยืนยัน',sub:'เปลี่ยนภายหลังไม่ได้',value:'ok',disabled:G.points===points}],{cancel:true});
     if(v==='ok'){G.hp=Math.min(G.hp,maxHP());G.pw=Math.min(G.pw,maxPW());renderStatus();saveSoon();return}
     if(v===null){G.stat=before;G.points=points;renderStatus();return}
     const beforeHP=maxHP(),beforePW=maxPW(),beforeSta=maxStam();
+    const tierBefore=perkTier(v);
     G.stat[v]++;G.points--;
+    if(perkTier(v)>tierBefore){const u=PERKS[v][tierBefore];await say(`ปลดล็อก ${u.name}! ${u.note}`,'ความสามารถใหม่')}
     G.hp+=maxHP()-beforeHP;G.pw+=maxPW()-beforePW;G.stam+=maxStam()-beforeSta;
     sfx.ok();renderStatus();
   }
@@ -229,7 +270,8 @@ async function statsMenu(){
   const sets=CROP_IDS.filter(k=>setCount(k)>=2).map(k=>`ชุด${CROPS[k].name} ${setCount(k)}/3`).join(', ')||'ยังไม่มี';
   const rows=[['เลเวล',`${G.lv} (EXP ${G.xp}/${xpNext()})`],['HP',`${G.hp}/${maxHP()}`],['MP',`${G.pw}/${maxPW()}`],['SP',`${G.stam}/${maxStam()}`],
     ['โจมตี',Math.round(atkOf())],['ป้องกัน',Math.round(defOf())],['ความเร็ว',spdOf()],
-    ['คริติคอล',`${Math.round(critChance()*100)}%`],['ความแม่นยำ',`${Math.round(hitChance()*100)}%`],
+    ['คริติคอล',`${Math.round(critChance()*100)}%`],['โจมตีเบิ้ล',`${Math.round(doubleChance()*100)}%`],['หลบการโจมตี',`${Math.round(dodgeChance()*100)}%`],['ความแม่นยำ',`${Math.round(hitChance()*100)}%`],
+    ...Object.values(PERKS).flat().filter(p=>G.stat[Object.keys(PERKS).find(k=>PERKS[k].includes(p))]>=p.at).map(p=>[p.name,p.note]),
     ['โบนัสชุด',sets],['พลังผลปีศาจ',G.power?FRUITS[G.power].skill:'ยังไม่มี']];
   const box=$('#sheet');box.innerHTML='';
   for(const[k,v]of rows){const dt=document.createElement('dt'),dd=document.createElement('dd');dt.textContent=k;dd.textContent=v;box.append(dt,dd)}

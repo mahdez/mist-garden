@@ -43,7 +43,8 @@ function setCount(crop){return SLOTS.filter(s=>G.equip[s]&&itemCrop(G.equip[s])=
 // Food always heals at least the weakest monster's current attack + 5, so eating stays worth a turn as mist rises.
 const HEAL_BONUS=5;
 const lowestAtk=()=>Math.min(...Object.values(MONSTERS).map(m=>m.atk))*(1+.15*(mist()-1));
-const eatHeal=k=>Math.max(CROPS[k].eat,Math.round(lowestAtk())+HEAL_BONUS);
+const eatHeal=k=>Math.round(Math.max(CROPS[k].eat,Math.round(lowestAtk())+HEAL_BONUS)*(perkTier('hp')>=2?1.5:1));
+const perkTier=k=>PERKS[k].filter(p=>(G.stat&&G.stat[k]||0)>=p.at).length;
 const statPts=k=>(G.stat&&G.stat[k]||0)*STATS[k].per;
 const maxHP=()=>40+(G.lv-1)*4+gearBonus('hat')+statPts('hp');
 const maxPW=()=>10+(G.lv-1)+statPts('pw');
@@ -51,6 +52,8 @@ const maxStam=()=>30+(G.lv-1)*2+statPts('sta');
 const atkOf=()=>6+(G.lv-1)*.5+G.sickle*2+gearBonus('weapon')+statPts('atk');
 const defOf=()=>3+gearBonus('shirt')+statPts('def');
 const spdOf=()=>6+(G.lv-1)*.25+statPts('spd');
+const doubleChance=()=>Math.min(.45,(G.stat&&G.stat.spd||0)*SPD_DOUBLE_PER_POINT);
+const dodgeChance=()=>Math.min(.35,(G.stat&&G.stat.spd||0)*SPD_DODGE_PER_POINT);
 const hitChance=()=>setCount('carrot')>=3?1:.92;
 const critChance=()=>.08+(setCount('carrot')>=2?.15:0);
 // Older saves grew stats automatically, so they receive the points for every level already gained.
@@ -63,6 +66,7 @@ function normalizeSave(g){
   return upgraded;
 }
 function useStamina(n){
+  if(perkTier('spd')>=2&&Math.random()<.2){note('มือไว! งานนี้ไม่ใช้ SP');return true}
   if(G.stam<n){note('SP หมดแล้ว เข้าบ้านไปนอนเพื่อฟื้น หรือกินผักในเมนู');sfx.back();return false}
   G.stam-=n;renderStatus();return true;
 }

@@ -26,6 +26,7 @@ function renderFarm(){
       const days=CROPS[s.c].days,st=s.g>=days?3:s.g===0?(s.w?1:0):Math.min(2,1+s.g);
       let ox=0;if(plotShake&&plotShake.i===b*6+a)ox=Math.round(Math.sin(time*50)*2);
       c.drawImage(cropArt(s.c,st),x+ox,y);
+      if(s.mutant){c.fillStyle=s.mutant==='rare'?'#ffd34a':'#c4a8f5';for(let i=0;i<4;i++){const a=time*3+i*1.57;c.fillRect(x+7+Math.cos(a)*7|0,y+7+Math.sin(a)*7|0,2,2)}}
     }
   }
   if(G){
@@ -101,7 +102,7 @@ function update(dt){
     }
   }
   if(P.moving){
-    P.t+=dt/.14;
+    P.t+=dt/(perkTier('spd')>=1?.09:.14);
     if(P.t>=1){P.moving=false;P.fx=P.x;P.fy=P.y;G.x=P.x;G.y=P.y;mapHint()}
   }
 }

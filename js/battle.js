@@ -21,12 +21,18 @@ function hurtEnemy(d,col){
   d=Math.max(1,Math.round(d));const e=bt.e;e.hp=Math.max(0,e.hp-d);bt.eflash=.22;bt.shake=2;pop('e',d);burst(e.px,e.py,col||'#fff',10);renderStatus();return d;
 }
 function hurtPlayer(d,col){
+  bt.dodged=false;
+  if(Math.random()<dodgeChance()){
+    bt.dodged=true;sfx.miss();burst(pos('p').x,pos('p').y,'#d8f0ff',6);setMsg('หลบได้!');renderStatus();return 0;
+  }
   d=Math.max(1,Math.round(d));
   if(bt.reflect){bt.reflect=false;hurtEnemy(d*1.5,'#ffcf6b')}
   if(bt.guard)d=Math.max(1,Math.round(d/2));
   G.hp=Math.max(0,G.hp-d);bt.pflash=.22;bt.shake=CALM?0:4;pop('p',d);const p=pos('p');burst(p.x,p.y,col||'#fff',10);renderStatus();return d;
 }
+const resistText=()=>bt.dodged?'หลบได้!':'ภูมิคุ้มกันกันไว้ได้!';
 function tryStatus(name,turns){
+  if(bt.dodged)return false;
   const n=setCount('pumpkin');
   if(n>=3||(n===2&&Math.random()<.5)){return false}
   bt.status[name]=turns;renderStatus();return true;
@@ -49,11 +55,17 @@ async function playerTurn(){
   renderStatus();
   for(;;){
     setMsg('จะทำอะไรดี?',`เทิร์นที่ ${bt.round} · ${bt.first==='p'?'เราออกก่อน':`${bt.e.name}ออกก่อน`}`);
-    const cmd=await choose([{label:'โจมตี',value:'atk'},{label:'สกิล',value:'skill'},{label:'กินผัก',value:'eat',disabled:!eatList().length},{label:'ป้องกัน',value:'guard'},{label:'หนี',value:'flee'}],{cols:2});
+    const cmd=await choose([{label:'โจมตี',value:'atk'},{label:'สกิล',value:'skill'},{label:'กินผัก',value:'eat',disabled:!eatList().length},{label:'ป้องกัน',value:'guard'}],{cols:2});
     if(cmd==='atk'){
       bt.plunge=.25;const r=playerAttack(1);
       if(r.miss){sfx.miss();await log('ตีพลาด!',620);break}
-      r.crit?sfx.crit():sfx.hit();setMsg(r.crit?'คริติคอล! โดนจุดสำคัญเต็ม ๆ':`โจมตี${bt.e.name}`);hurtEnemy(r.d);await wait(620);break;
+      r.crit?sfx.crit():sfx.hit();setMsg(r.crit?'คริติคอล! โดนจุดสำคัญเต็ม ๆ':`โจมตี${bt.e.name}`);hurtEnemy(r.d);await wait(620);
+      if(bt.e.hp>0&&Math.random()<doubleChance()){
+        bt.plunge=.25;const r2=playerAttack(1);
+        if(r2.miss){sfx.miss();await log('โจมตีเบิ้ล แต่พลาด!',560)}
+        else{sfx.hit();setMsg('เร็วจนโจมตีเบิ้ล!');hurtEnemy(r2.d);await wait(620)}
+      }
+      break;
     }
     if(cmd==='skill'){
       setMsg(`ใช้สกิลอะไร? MP ${G.pw}/${maxPW()}`);
@@ -82,10 +94,6 @@ async function playerTurn(){
       const v=eatVeg(k);sfx.heal();pop('p','+'+v,'#7fd483');const p=pos('p');burst(p.x,p.y,'#7fd483',12);renderStatus();await log(k==='golden'?`กิน${GOLDEN_VEG.name} ฟื้น HP MP SP เต็ม!`:`กิน${CROPS[k].name} ฟื้น HP ${v}`,620);break;
     }
     if(cmd==='guard'){bt.guard=true;G.pw=Math.min(maxPW(),G.pw+1);renderStatus();await log('ตั้งท่าป้องกัน รับความเสียหายครึ่งเดียว และได้ MP คืน 1',620);break}
-    if(cmd==='flee'){
-      if(Math.random()<.65){await log('หนีออกมาได้!',600);bt.fled=true;return}
-      await log('หนีไม่พ้น!',600);break;
-    }
   }
   bt.active=null;renderStatus();
 }
@@ -97,17 +105,17 @@ async function enemyTurn(){
       e.charging=false;sfx.boom();setMsg('ตูม! มะเขือเทศระเบิดกระจาย!');burst(e.px,e.py,'#d9413f',40);hurtPlayer(hit(2.6),'#ff8a7a');e.hp=0;bt.boom=true;await wait(1000);return;
     }
     if(e.turns>=3||e.hp<e.maxhp*.5){e.charging=true;sfx.enc();await log(`${e.name}บวมเป่ง! ฆ่ามันให้ทันในเทิร์นนี้ หรือสั่งป้องกัน`,1200);bt.active=null;return}
-    if(Math.random()<.35){setMsg(`${e.name}พ่นน้ำเปรี้ยว!`);sfx.hit();bt.elunge=.25;hurtPlayer(hit(.6),'#c98cff');const ok=tryStatus('poison',3);await log(ok?'ติดพิษ 3 เทิร์น!':'ภูมิคุ้มกันกันพิษไว้ได้!',720);bt.active=null;return}
+    if(Math.random()<.35){setMsg(`${e.name}พ่นน้ำเปรี้ยว!`);sfx.hit();bt.elunge=.25;hurtPlayer(hit(.6),'#c98cff');const ok=tryStatus('poison',3);await log(ok?'ติดพิษ 3 เทิร์น!':resistText(),720);bt.active=null;return}
   }
   if(e.kind==='carrot'){
     const r=Math.random();
     if(r<.3){setMsg(`${e.name}ทิ่มรัว 2 ครั้ง!`);bt.elunge=.25;sfx.hit();hurtPlayer(hit(.6));await wait(260);sfx.hit();bt.elunge=.25;hurtPlayer(hit(.6));await wait(520);bt.active=null;return}
-    if(r<.5){setMsg(`${e.name}สะบัดดินใส่หน้า!`);bt.elunge=.25;hurtPlayer(hit(.4));const ok=tryStatus('blind',3);await log(ok?'ตาพร่า ตีพลาดง่ายขึ้น 3 เทิร์น!':'ภูมิคุ้มกันกันไว้ได้!',760);bt.active=null;return}
+    if(r<.5){setMsg(`${e.name}สะบัดดินใส่หน้า!`);bt.elunge=.25;hurtPlayer(hit(.4));const ok=tryStatus('blind',3);await log(ok?'ตาพร่า ตีพลาดง่ายขึ้น 3 เทิร์น!':resistText(),760);bt.active=null;return}
   }
   if(e.kind==='pumpkin'){
     if(e.charging){
       e.charging=false;setMsg(`${e.name}ทุบลงมาเต็มแรง!`);sfx.crit();bt.elunge=.3;hurtPlayer(hit(1.6));
-      if(!bt.guard&&G.hp>0){const ok=tryStatus('stun',true);await log(ok?'มึนงง เสียเทิร์นถัดไป!':'ภูมิคุ้มกันดี ไม่มึนงง!',800)}else await wait(760);
+      if(!bt.guard&&G.hp>0){const ok=tryStatus('stun',true);await log(ok?'มึนงง เสียเทิร์นถัดไป!':resistText(),800)}else await wait(760);
       bt.active=null;return;
     }
     if(e.turns%3===0){e.charging=true;sfx.enc();await log(`${e.name}ง้างตัวขึ้นสูง! เทิร์นหน้าควรสั่งป้องกัน`,1200);bt.active=null;return}
@@ -118,17 +126,20 @@ async function battle(kind,rare){
   const L=mist(),m=MONSTERS[kind],sc=(1+.15*(L-1))*(rare?1.5:1);
   await fadeTo(1,160);
   const e={kind,rare,name:(rare?`${CROPS[kind].name}ทองคำ`:m.name),maxhp:Math.round(m.hp*sc),hp:Math.round(m.hp*sc),atk:m.atk*sc,def:m.def*sc,spd:m.spd,xp:Math.round(m.xp*sc*(rare?2:1)),gold:Math.round(m.gold*sc*(rare?2:1)),px:92,py:122,turns:0,charging:false};
-  bt={e,fx:[],floats:[],round:1,active:null,shake:0,eflash:0,pflash:0,elunge:0,plunge:0,fled:false,boom:false,guard:false,reflect:false,status:{poison:0,blind:0,stun:false}};
+  bt={e,fx:[],floats:[],round:1,active:null,shake:0,eflash:0,pflash:0,elunge:0,plunge:0,boom:false,guard:false,reflect:false,status:{poison:0,blind:0,stun:false}};
   mode='battle';renderSeeds();renderStatus();
   await fadeTo(0,160);
   await log(rare?`ร่างหายาก! ${e.name}โผล่ออกมาจากดิน!`:`${e.name}โผล่ออกมาจากดิน!`,800);
   let res=null;
-  outer:for(;;){
-    const order=[{w:'p',s:spdOf()+rand(0,4)},{w:'e',s:e.charging?-99:e.spd+rand(0,4)}].sort((a,b)=>b.s-a.s);
+  if(spdOf()>e.spd){
+    setMsg(`เราเร็วกว่า (ความเร็ว ${spdOf()} ต่อ ${e.spd}) จะสู้หรือถอยไปก่อน? ถอยแล้วไม่เสียอะไร และกลับมาสู้ตัวเดิมได้`);
+    if(!await choose([{label:'สู้เลย',value:1},{label:'ถอยไปก่อน',value:0}]))res='retreat';
+  }else await log(`เราไม่เร็วกว่ามัน (ความเร็ว ${spdOf()} ต่อ ${e.spd}) ถอยไม่ได้ ต้องสู้!`,1000);
+  if(!res)outer:for(;;){
+    const order=[{w:'p',s:bt.round===1&&perkTier('spd')>=1?99:spdOf()+rand(0,4)},{w:'e',s:e.charging?-99:e.spd+rand(0,4)}].sort((a,b)=>b.s-a.s);
     bt.first=order[0].w;
     for(const o of order){
       if(o.w==='p')await playerTurn();else await enemyTurn();
-      if(bt.fled){res='flee';break outer}
       if(G.hp<=0){res='lose';break outer}
       if(e.hp<=0){res=bt.boom?'boom':'win';break outer}
     }
