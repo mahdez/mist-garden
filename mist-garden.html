@@ -1,0 +1,960 @@
+<title>สวนในหมอก</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Itim&family=Sriracha&display=swap">
+<style>
+/* Layout: a farm stand. The pixel field sits beside (wide) or above (narrow) wooden signboards holding status and choices. Lilac is reserved for the meteor mist. */
+:root{
+  --soil:#1b130d; --plank:#463222; --plank2:#2f2116; --edge:#c9a673; --groove:#6d4f33;
+  --ink:#f6ecd8; --dim:#c9b797; --sprout:#a4d96c; --mist:#c4a8f5; --coin:#ffcf6b; --hp:#7fd483; --pw:#f0a24e; --bad:#ff8a70;
+  --display:'Sriracha','Itim','Leelawadee UI',Tahoma,sans-serif;
+  --body:'Itim','Leelawadee UI','Noto Sans Thai',Tahoma,sans-serif;
+  color-scheme:dark;
+}
+html,body{height:100%}
+*{box-sizing:border-box}
+body{background:var(--soil);color:var(--ink);font:400 16px/1.42 var(--body);
+  padding-block:12px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+#game{display:flex;flex-direction:column;gap:10px;max-width:1160px;margin:0 auto}
+#screen{position:relative;width:min(100%,calc((100dvh - 350px)*4/3));min-width:min(100%,280px);max-width:100%;margin:0 auto;aspect-ratio:4/3;
+  container-type:inline-size;border:3px solid var(--edge);box-shadow:0 0 0 2px #0c0805;background:#000;flex:none}
+canvas{display:block;width:100%;height:100%;image-rendering:pixelated;cursor:pointer;touch-action:manipulation}
+canvas:focus-visible{outline:2px solid var(--sprout);outline-offset:2px}
+#over{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2cqw;text-align:center;padding:6cqw;pointer-events:none}
+#over:not(:empty){background:rgba(24,12,40,.5)}
+#over h1{margin:0;font:400 12cqw/1.2 var(--display);color:var(--sprout);text-shadow:0 .6cqw 0 #23400f,0 0 6cqw rgba(196,168,245,.8)}
+#over p{margin:0;font-size:max(14px,3.4cqw);max-width:80cqw;text-shadow:0 1px 0 #000,0 0 8px #000}
+#panel{display:flex;flex-direction:column;gap:8px;min-width:0;flex:1}
+.board{background:linear-gradient(180deg,var(--plank),var(--plank2));border:2px solid var(--edge);border-radius:3px;box-shadow:0 0 0 2px #0c0805,inset 0 0 0 1px var(--groove)}
+#status{padding:8px 11px;display:grid;gap:4px}
+#status:empty{display:none}
+.row{display:flex;justify-content:space-between;align-items:baseline;gap:10px;font-variant-numeric:tabular-nums}
+.row b{font-weight:400;color:var(--sprout);font-size:17px}
+.row small{color:var(--dim);font-size:13px}
+.bar{height:6px;background:#140d08;border:1px solid var(--groove)}
+.bar i{display:block;height:100%;transition:width .25s}
+.hp i{background:var(--hp)} .pw i{background:var(--pw)} .low i{background:var(--bad)}
+.tags{display:flex;flex-wrap:wrap;gap:4px;font-size:13px}
+.tags:empty{display:none}
+.tags span{padding:0 7px;border:1px solid var(--groove);border-radius:9px;background:rgba(0,0,0,.2)}
+.tags .bad{border-color:var(--bad);color:var(--bad)}
+.tags .set{border-color:var(--sprout);color:var(--sprout)}
+#ctx{flex:1;padding:10px 12px;display:flex;flex-direction:column;gap:7px;min-height:150px;min-width:0}
+#who{color:var(--coin);font-size:14px}
+#who:empty{display:none}
+#msg{margin:0;min-height:1.42em;text-wrap:pretty}
+#hint{margin:0;color:var(--dim);font-size:14px}
+#hint:empty{display:none}
+#savecode{width:100%;height:92px;resize:vertical;font:13px/1.35 ui-monospace,Consolas,monospace;color:var(--ink);background:#140d08;border:1px solid var(--groove);border-radius:3px;padding:6px;word-break:break-all}
+#savecode:focus-visible{outline:2px solid var(--sprout)}
+#seeds{display:flex;flex-wrap:wrap;gap:5px}
+#seeds:empty{display:none}
+#seeds button{all:unset;cursor:pointer;padding:3px 9px;border:1px solid var(--groove);border-radius:3px;font-size:14px;background:rgba(0,0,0,.18)}
+#seeds button.on{border-color:var(--sprout);color:var(--sprout);background:rgba(164,217,108,.12)}
+#seeds button:focus-visible{outline:2px solid var(--sprout)}
+#menu{display:grid;gap:3px;overflow:auto;max-height:210px;padding:1px}
+#menu:empty{display:none}
+#menu button{all:unset;box-sizing:border-box;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:10px;min-height:36px;padding:4px 10px 4px 22px;border-radius:3px;position:relative;min-width:0}
+#menu button small{color:var(--dim);font-size:13px;text-align:right}
+#menu button.sel{background:rgba(255,240,205,.14)}
+#menu button.sel::before{content:"▸";position:absolute;left:7px;color:var(--coin)}
+#menu button[aria-disabled=true]{color:#8d7c63;cursor:default}
+#menu button:focus-visible{outline:2px solid var(--sprout)}
+#foot{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px 10px;font-size:14px;color:var(--dim);padding-inline:3px;font-variant-numeric:tabular-nums}
+#foot b{font-weight:400;color:var(--coin)}
+#foot .m{color:var(--mist)}
+#foot button{all:unset;cursor:pointer;padding:2px 8px;border:1px solid var(--groove);border-radius:3px}
+#foot button:focus-visible{outline:2px solid var(--sprout)}
+#pad{display:none;justify-content:space-between;align-items:center;gap:12px;padding:2px 6px;touch-action:none;user-select:none;-webkit-user-select:none}
+#pad.show{display:flex}
+#dpad{display:grid;grid-template-columns:repeat(3,44px);grid-template-rows:repeat(3,40px);gap:3px}
+#pad button{all:unset;display:grid;place-items:center;background:var(--plank2);border:2px solid var(--groove);border-radius:5px;touch-action:none;cursor:pointer}
+#pad button:active{background:var(--groove)}
+#ab{display:flex;gap:10px}
+#ab button{width:68px;height:68px;border-radius:50%}
+@media (pointer:fine) and (min-width:780px){#pad.show{display:none}}
+@media (min-width:780px){
+  #game{display:grid;grid-template-columns:minmax(0,1fr) 320px;align-items:start;gap:14px}
+  #screen{width:min(100%,calc((100dvh - 30px)*4/3))}
+  #menu{max-height:320px}
+}
+</style>
+
+<main id="game">
+  <div id="screen">
+    <canvas id="cv" width="320" height="240" tabindex="0" aria-label="หน้าจอฟาร์ม"></canvas>
+    <div id="over"></div>
+  </div>
+  <section id="panel">
+    <div id="status" class="board" aria-label="สถานะชาวนา"></div>
+    <div id="ctx" class="board" aria-live="polite">
+      <div id="who"></div>
+      <p id="msg"></p>
+      <p id="hint"></p>
+      <textarea id="savecode" hidden spellcheck="false" aria-label="รหัสเซฟ"></textarea>
+      <div id="seeds"></div>
+      <div id="menu"></div>
+    </div>
+    <div id="pad">
+      <div id="dpad">
+        <span></span><button data-d="up" aria-label="ขึ้น">▲</button><span></span>
+        <button data-d="left" aria-label="ซ้าย">◀</button><span></span><button data-d="right" aria-label="ขวา">▶</button>
+        <span></span><button data-d="down" aria-label="ลง">▼</button><span></span>
+      </div>
+      <div id="ab"><button id="btnMenu" type="button">เมนู</button><button id="btnAct" type="button">ทำงาน</button></div>
+    </div>
+    <div id="foot"><span id="info"></span><button id="mute" type="button">เสียง: เปิด</button></div>
+  </section>
+</main>
+
+<script>
+'use strict';
+const $=s=>document.querySelector(s);
+const cv=$('#cv'),c=cv.getContext('2d');
+const T=16,W=320,H=240,TAU=Math.PI*2;
+const wait=ms=>new Promise(r=>setTimeout(r,ms));
+const rand=(a,b)=>a+Math.random()*(b-a);
+const pick=a=>a[Math.floor(Math.random()*a.length)];
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const CALM=matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* ---------- Sound ---------- */
+let ac=null,muted=false;
+try{muted=localStorage.getItem('mg-mute')==='1'}catch(e){}
+function tone(f,d=.08,type='square',v=.04,at=0){
+  if(muted)return;
+  try{
+    ac=ac||new (window.AudioContext||window.webkitAudioContext)();
+    if(ac.state==='suspended')ac.resume();
+    const o=ac.createOscillator(),g=ac.createGain(),t=ac.currentTime+at;
+    o.type=type;o.frequency.value=f;g.gain.setValueAtTime(v,t);g.gain.exponentialRampToValueAtTime(.001,t+d);
+    o.connect(g).connect(ac.destination);o.start(t);o.stop(t+d);
+  }catch(e){}
+}
+const sfx={
+  move(){tone(520,.04)},ok(){tone(760,.06)},back(){tone(300,.07)},
+  plant(){tone(420,.06,'triangle',.07);tone(560,.06,'triangle',.06,.05)},
+  water(){[900,760,640].forEach((f,i)=>tone(f,.06,'sine',.05,i*.04))},
+  harvest(){[600,800,1000].forEach((f,i)=>tone(f,.08,'triangle',.07,i*.05))},
+  coin(){[880,1320].forEach((f,i)=>tone(f,.08,'square',.04,i*.07))},
+  hit(){tone(140,.12,'sawtooth',.07)},crit(){tone(120,.2,'sawtooth',.09);tone(90,.2,'square',.05,.04)},
+  miss(){tone(240,.1,'sine',.04)},heal(){[620,830,1040].forEach((f,i)=>tone(f,.14,'sine',.07,i*.07))},
+  win(){[523,659,784,1047].forEach((f,i)=>tone(f,.16,'square',.05,i*.12))},
+  enc(){[220,180,140,110].forEach((f,i)=>tone(f,.12,'sawtooth',.07,i*.08))},
+  boom(){tone(70,.5,'sawtooth',.12);tone(50,.5,'square',.08,.05)},
+};
+
+/* ---------- Game data ---------- */
+const CROPS={
+  carrot:{name:'แครอท',seed:5,sell:12,days:2,eat:10,
+    fact:'แครอทมีเบตาแคโรทีน ร่างกายเปลี่ยนเป็นวิตามิน A ซึ่งจำเป็นต่อการมองเห็น',
+    power:'ตาไว',set2:'โอกาสคริติคอล +15%',set3:'ตีไม่พลาด และคริติคอลแรงขึ้น'},
+  tomato:{name:'มะเขือเทศ',seed:12,sell:30,days:3,eat:18,
+    fact:'มะเขือเทศมีวิตามิน C ซึ่งร่างกายใช้สร้างคอลลาเจนและสมานแผล',
+    power:'แผลหายไว',set2:'ฟื้น HP 2 ทุกเทิร์น',set3:'ฟื้น HP 4 ทุกเทิร์น'},
+  pumpkin:{name:'ฟักทอง',seed:25,sell:70,days:4,eat:35,
+    fact:'ฟักทองมีเบตาแคโรทีนและวิตามิน C ซึ่งมีส่วนช่วยระบบภูมิคุ้มกัน',
+    power:'ภูมิคุ้มกันดี',set2:'ลดโอกาสติดสถานะ 50%',set3:'กันสถานะผิดปกติทั้งหมด'},
+};
+const CROP_IDS=['carrot','tomato','pumpkin'];
+const SLOTS=['weapon','hat','shirt'];
+const SLOT_NAME={weapon:'อาวุธ',hat:'หมวก',shirt:'เสื้อ'};
+const GEAR={
+  carrot:{weapon:['ดาบแครอท',3],hat:['หมวกใบแครอท',6],shirt:['เสื้อแครอท',2],cloth:'#e8862e'},
+  tomato:{weapon:['ค้อนมะเขือเทศ',4],hat:['หมวกมะเขือเทศ',9],shirt:['เสื้อมะเขือเทศ',3],cloth:'#cf3f3a'},
+  pumpkin:{weapon:['กระบองฟักทอง',5],hat:['หมวกฟักทอง',12],shirt:['เกราะฟักทอง',4],cloth:'#b9742a'},
+};
+const itemId=(crop,slot)=>crop+'_'+slot;
+const itemCrop=id=>id.split('_')[0];
+const itemSlot=id=>id.split('_')[1];
+const itemName=id=>GEAR[itemCrop(id)][itemSlot(id)][0];
+const MONSTERS={
+  carrot:{name:'แครอทคลั่ง',hp:22,atk:7,def:1,spd:9,xp:8,gold:12},
+  tomato:{name:'มะเขือเทศระเบิด',hp:20,atk:8,def:1,spd:5,xp:14,gold:28},
+  pumpkin:{name:'ฟักทองยักษ์',hp:55,atk:11,def:4,spd:3,xp:30,gold:60},
+};
+const SPR={
+  carrot:{pal:{k:'#3a1a08',o:'#f28a2c',d:'#c9651a',l:'#ffb45e',g:'#3fa34d',h:'#2a7a3a',w:'#ffffff',e:'#1a0a04'},gold:{o:'#ffd34a',d:'#c99a1f',l:'#fff0a0',g:'#c4a8f5',h:'#8d6fd0'},rows:[
+    ".....g..g..g....","......g.g.g.....","......gghgg.....",".......ggg......",".....kkkkkk.....","....kooooook....","....kloooodk....","....koweoweok...","....koooooodk...","....kookkkodk...",".....koooodk....",".....kloodk.....","......koodk.....","......kodk......",".......kk......."]},
+  tomato:{pal:{k:'#3a0a0a',r:'#d9413f',d:'#a52d2c',l:'#ff8a7a',g:'#3fa34d',w:'#ffffff',e:'#1a0505'},gold:{r:'#ffd34a',d:'#c99a1f',l:'#fff0a0',g:'#c4a8f5'},rows:[
+    "......g.gg......",".....ggggg......","....kkggggkk....","..kkrrrggrrrkk..",".krrlrrrrrrrrrk.",".krlrrrrrrrrrdk.","krrrwerrrrwerrdk","krrrrrrrrrrrrrdk","krrkwkwkwkwkrrdk","krrrkwkwkwkrrrdk",".krrrkkkkkrrrdk.",".krrrrrrrrrrddk.","..kkdddddddkk...","....kkkkkkkk...."]},
+  pumpkin:{pal:{k:'#2e1505',o:'#e88a2a',d:'#b5621a',y:'#ffe15c',h:'#3f8a3a'},gold:{o:'#ffd34a',d:'#c99a1f',h:'#c4a8f5',y:'#ffffff'},rows:[
+    ".......hh.......","......hhh.......","...kkkkhhkkkk...","..koodooodoook..",".koodoooodooodk.",".kodoooooooodok.","koodkkooookkdook","koodkykoookykdok","koodoooooooodok.","kodookokokokodok","koodookkkkkkodok",".koodoooooodook.","..kkddddddddkk..","....kkkkkkkk...."]},
+};
+const MAP=[
+"TTTTTTTTTTTTTTTTTTTT",
+"T.RRRRR.....aaaa...T",
+"T.RRRRR.....aaaa...T",
+"T.WWDWW.....cccc...T",
+"T...,........,,....T",
+"T...,,,,,,,,,,,....T",
+"T..................T",
+"T..................T",
+"T.............b....T",
+"T..o...............T",
+"T..................T",
+"T..................T",
+"T~~~~..........MM..T",
+"T~~~~..........MM..T",
+"TTTTTTTTTTTTTTTTTTTT"];
+const SOLID='TRWDacbo~M';
+const PX=6,PY=6;
+
+/* ---------- State ---------- */
+let G=null,mode='title',fade=0,time=0,shake=0;
+const P={x:4,y:5,fx:4,fy:5,dir:'down',moving:false,t:0,path:null,then:null};
+let fxMap=[];
+function newGame(){
+  const plots=[];for(let i=0;i<36;i++)plots.push({c:null,g:0,w:false});
+  return {day:1,gold:40,shards:0,lv:1,xp:0,hp:40,pw:10,seeds:{carrot:6,tomato:0,pumpkin:0},veg:{carrot:0,tomato:0,pumpkin:0},
+    items:{},equip:{weapon:null,hat:null,shirt:null},plots,land:0,sickle:0,can:0,harvests:0,pity:0,sel:'carrot',
+    seen:{carrot:{n:0,rare:0},tomato:{n:0,rare:0},pumpkin:{n:0,rare:0}},x:4,y:5};
+}
+const SAVE='mist-garden-save-v1';
+function save(){try{localStorage.setItem(SAVE,JSON.stringify({...G,x:P.x,y:P.y}))}catch(e){}}
+let saveT=0;function saveSoon(){clearTimeout(saveT);saveT=setTimeout(save,500)}
+function loadSave(){try{const s=localStorage.getItem(SAVE);return s?JSON.parse(s):null}catch(e){return null}}
+const CODE_PREFIX='MG1-';
+function exportCode(){return CODE_PREFIX+btoa(encodeURIComponent(JSON.stringify({...G,x:P.x,y:P.y})))}
+function importCode(text){
+  try{
+    const t=text.replace(/\s+/g,'');if(!t.startsWith(CODE_PREFIX))return null;
+    const o=JSON.parse(decodeURIComponent(atob(t.slice(CODE_PREFIX.length))));
+    if(!Number.isFinite(o.day)||!Number.isFinite(o.lv)||!Number.isFinite(o.gold)||!Array.isArray(o.plots)||o.plots.length!==36)return null;
+    const b=newGame(),g={...b,...o,seeds:{...b.seeds,...o.seeds},veg:{...b.veg,...o.veg},equip:{...b.equip,...o.equip},seen:{...b.seen,...o.seen}};
+    if(blocked(g.x,g.y)){g.x=b.x;g.y=b.y}
+    return g;
+  }catch(e){return null}
+}
+const mist=()=>Math.min(9,1+Math.floor((G.day-1)/7));
+const landSize=()=>4+G.land;
+const plotAt=(x,y)=>{const a=x-PX,b=y-PY;return a>=0&&b>=0&&a<6&&b<6?{i:b*6+a,a,b,unlocked:a<landSize()&&b<landSize()}:null};
+function gearBonus(slot){const id=G.equip[slot];if(!id)return 0;const base=GEAR[itemCrop(id)][slot][1],lv=G.items[id]||1;return base+(lv-1)*(slot==='hat'?3:1)}
+function setCount(crop){return SLOTS.filter(s=>G.equip[s]&&itemCrop(G.equip[s])===crop).length}
+const maxHP=()=>40+(G.lv-1)*8+gearBonus('hat');
+const maxPW=()=>10+(G.lv-1);
+const atkOf=()=>6+(G.lv-1)*1.5+G.sickle*2+gearBonus('weapon');
+const defOf=()=>3+(G.lv-1)*.8+gearBonus('shirt');
+const xpNext=()=>Math.floor(15*G.lv**1.5);
+
+/* ---------- Pixel art ---------- */
+function mk(w,h){const e=document.createElement('canvas');e.width=w;e.height=h;return e}
+function seeded(s){return ()=>(s=(s*1664525+1013904223)>>>0)/4294967296}
+function tile(fn){const e=mk(T,T),g=e.getContext('2d');fn((x,y,w,h,k)=>{g.fillStyle=k;g.fillRect(x,y,w,h)});return e}
+function speck(P,base,cols,n,seed){P(0,0,T,T,base);const r=seeded(seed);for(let i=0;i<n;i++)P(r()*T|0,r()*T|0,1,1,cols[r()*cols.length|0])}
+const grass=P=>speck(P,'#4c8a52',['#437c49','#589a5e','#3c7042'],16,7);
+const TILES={
+  '.':tile(grass),
+  ',':tile(P=>speck(P,'#b59a63',['#a48a55','#c4ab74','#94794a'],14,11)),
+  'T':tile(P=>{grass(P);P(6,11,4,5,'#54351f');P(2,2,12,9,'#22643e');P(1,4,14,6,'#22643e');P(4,0,8,3,'#22643e');P(3,2,7,3,'#318452');P(5,1,4,2,'#42a067');P(10,7,3,2,'#1b5433')}),
+  'R':tile(P=>{P(0,0,T,T,'#8c5a35');for(let y=0;y<T;y+=4){P(0,y,T,1,'#6e4527');P(y%8?2:9,y+1,5,1,'#a87245')}}),
+  'W':tile(P=>{P(0,0,T,T,'#d9c6a0');P(0,0,T,2,'#7a5636');P(0,14,T,2,'#7a5636');P(0,0,2,T,'#7a5636');P(14,0,2,T,'#7a5636');P(6,5,4,5,'#3d5a78');P(6,5,4,1,'#ffe29a')}),
+  'D':tile(P=>{P(0,0,T,T,'#d9c6a0');P(0,0,T,2,'#7a5636');P(3,3,10,13,'#5a3820');P(4,4,8,12,'#7f5230');P(10,10,1,2,'#ffd65e')}),
+  'a':tile(P=>{for(let x=0;x<T;x+=8){P(x,0,4,T,'#d9534a');P(x+4,0,4,T,'#f3e6cd')}P(0,14,T,2,'#00000030')}),
+  'c':tile(P=>{P(0,0,T,T,'#8a6238');P(0,0,T,3,'#b3854e');P(0,8,T,1,'#6e4c2a');P(3,1,2,2,'#f28a2c');P(9,1,3,2,'#d9413f')}),
+  'b':tile(P=>{grass(P);P(1,5,14,10,'#8a6238');P(1,5,14,2,'#b3854e');P(1,10,14,1,'#6e4c2a');P(7,3,2,4,'#ffcf6b')}),
+  'o':tile(P=>{grass(P);P(3,5,10,10,'#7d8590');P(5,7,6,6,'#2f5d8a');P(5,7,6,1,'#7fb8e8');P(2,2,12,2,'#7a5636');P(3,4,1,3,'#54351f');P(12,4,1,3,'#54351f')}),
+};
+const WATER=[0,1].map(f=>tile(P=>{P(0,0,T,T,'#3572b0');P(2+f*3,4,5,1,'#7fb8e8');P(9-f*4,10,4,1,'#7fb8e8');P(1,13-f,3,1,'#4d8ccb')}));
+const METEOR=[0,1].map(f=>{const e=mk(32,32),g=e.getContext('2d'),F=(x,y,w,h,k)=>{g.fillStyle=k;g.fillRect(x,y,w,h)},r=seeded(23),glow=f?'#e6d8ff':'#c4a8f5';
+  F(2,22,28,8,'#5a4129');F(0,25,32,4,'#5a4129');F(8,5,16,24,'#3b3050');F(4,9,24,18,'#3b3050');F(2,14,28,10,'#3b3050');F(9,6,9,3,'#544670');F(5,10,7,4,'#544670');
+  for(let i=0;i<46;i++)F(4+r()*24|0,7+r()*20|0,2,1,r()>.5?'#2b2240':'#4a3d63');
+  F(15,9,2,5,glow);F(12,13,4,2,glow);F(11,15,2,6,glow);F(17,14,5,2,glow);F(21,15,2,5,glow);F(16,19,2,6,glow);
+  return e});
+const DIRT=[0,1].map(w=>tile(P=>{const b=w?'#4a3424':'#7c5c3a',l=w?'#5a4130':'#8e6d48',d=w?'#3b2a1c':'#6a4d30';P(0,0,T,T,b);for(let y=2;y<T;y+=5){P(1,y,14,1,d);P(1,y+1,14,1,l)}P(0,0,T,1,d);P(0,0,1,T,d)}));
+const LOCKED=tile(P=>{grass(P);P(1,5,1,8,'#7a5636');P(14,5,1,8,'#7a5636');P(1,7,14,1,'#8e6a43');P(1,10,14,1,'#8e6a43')});
+const CROPART={};
+function cropArt(kind,stage){
+  const k=kind+stage;if(CROPART[k])return CROPART[k];
+  const leaf='#4fae56',dark='#2f7f3e';
+  return CROPART[k]=tile(P=>{
+    if(stage===0){P(7,9,2,2,'#e6d3a0');return}
+    if(stage===1){P(7,8,2,5,leaf);P(5,7,3,2,leaf);P(8,6,3,2,dark);return}
+    if(stage===2){
+      P(7,5,2,8,dark);P(4,5,4,2,leaf);P(8,3,4,2,leaf);P(5,9,3,2,leaf);P(8,8,3,2,dark);
+      if(kind==='pumpkin'){P(9,11,4,3,'#7fae3f')}
+      return;
+    }
+    if(kind==='carrot'){P(4,1,2,6,leaf);P(7,0,2,7,dark);P(10,1,2,6,leaf);P(4,6,8,3,'#f28a2c');P(5,9,6,3,'#e87d22');P(6,12,4,2,'#c9651a');P(5,7,2,1,'#ffb45e')}
+    if(kind==='tomato'){P(7,1,2,13,dark);P(3,3,10,2,leaf);P(3,8,10,2,leaf);[[3,5],[10,4],[9,10],[3,11]].forEach(([x,y])=>{P(x,y,4,4,'#d9413f');P(x+1,y,1,1,'#ff8a7a')})}
+    if(kind==='pumpkin'){P(7,1,2,4,dark);P(3,2,5,2,leaf);P(2,5,12,9,'#e88a2a');P(1,7,14,5,'#e88a2a');for(const x of[4,7,10])P(x,5,1,9,'#b5621a');P(3,6,2,1,'#ffb45e')}
+  });
+}
+function spriteFrom(def,alt,flash){
+  const pal={...def.pal,...(alt||{})},w=Math.max(...def.rows.map(r=>r.length)),e=mk(w,def.rows.length),g=e.getContext('2d');
+  def.rows.forEach((r,y)=>[...r].forEach((ch,x)=>{if(!pal[ch])return;g.fillStyle=flash?'#ffffff':pal[ch];g.fillRect(x,y,1,1)}));
+  return e;
+}
+const SPC={};for(const k in SPR)SPC[k]={n:spriteFrom(SPR[k]),r:spriteFrom(SPR[k],SPR[k].gold),f:spriteFrom(SPR[k],null,true)};
+const charCache={};
+function look(){
+  const id=s=>G&&G.equip[s]?itemCrop(G.equip[s]):null;
+  return {shirt:id('shirt'),hat:id('hat'),weapon:id('weapon')};
+}
+function charSprite(l,dir,step){
+  const key=[l.shirt,l.hat,l.weapon,dir,step].join();if(charCache[key])return charCache[key];
+  const e=mk(T,T),g=e.getContext('2d');
+  const P=(x,y,w,h,k)=>{g.fillStyle=k;g.fillRect(x,y,w,h)};
+  const flip=dir==='right',d=flip?'left':dir,skin='#f0c39a',legs='#3b4f7a',hair='#5a3a22',cloth=l.shirt?GEAR[l.shirt].cloth:'#3f6ea8';
+  P(4,9,8,4,cloth);
+  if(!l.shirt){P(5,9,1,4,'#e8d9b0');P(10,9,1,4,'#e8d9b0')}
+  if(l.shirt==='pumpkin'){P(6,9,1,4,'#8a5118');P(9,9,1,4,'#8a5118')}
+  if(d==='down'||d==='up'){P(3,9,1,3,skin);P(12,9,1,3,skin);P(5,13,2,step===1?1:3,legs);P(9,13,2,step===2?1:3,legs)}
+  else{P(7,9,2,3,skin);P(6,13,step===1?1:2,3,legs);P(9,13,step===2?1:2,3,legs)}
+  P(4,2,8,7,skin);
+  if(d==='up')P(4,1,8,7,hair);
+  else{P(4,2,8,2,hair);if(d==='down'){P(6,5,1,2,'#222');P(9,5,1,2,'#222')}else{P(5,5,1,2,'#222');P(10,2,3,6,hair)}}
+  if(!l.hat){P(2,3,12,1,'#e3c56c');P(4,1,8,2,'#d9b860');P(4,2,8,1,'#a8793a')}
+  if(l.hat==='carrot'){P(4,2,8,2,'#f28a2c');P(3,3,10,1,'#c9651a');P(4,0,2,2,'#4fae56');P(7,0,2,2,'#2f7f3e');P(10,0,2,2,'#4fae56')}
+  if(l.hat==='tomato'){P(3,1,10,3,'#d9413f');P(4,1,2,1,'#ff8a7a');P(5,0,6,2,'#3fa34d')}
+  if(l.hat==='pumpkin'){P(2,0,12,5,'#e88a2a');for(const x of[5,8,11])P(x,0,1,5,'#b5621a');P(7,0,2,1,'#3f8a3a')}
+  if(d==='left'){
+    if(!l.weapon){P(1,4,1,10,'#9c6b3a');P(0,3,3,2,'#bfc6cf')}
+    if(l.weapon==='carrot'){P(1,2,2,9,'#f28a2c');P(1,1,1,1,'#ffb45e');P(0,11,4,1,'#3fa34d');P(1,12,2,2,'#3fa34d')}
+    if(l.weapon==='tomato'){P(1,6,1,8,'#9c6b3a');P(0,2,4,4,'#d9413f');P(1,2,2,1,'#3fa34d')}
+    if(l.weapon==='pumpkin'){P(1,7,1,7,'#7a4a20');P(0,2,4,5,'#e88a2a');P(1,2,1,5,'#b5621a')}
+  }
+  if(flip){const f=mk(T,T),h=f.getContext('2d');h.translate(T,0);h.scale(-1,1);h.drawImage(e,0,0);return charCache[key]=f}
+  return charCache[key]=e;
+}
+const DIGITS={'0':'111101101101111','1':'010110010010111','2':'111001111100111','3':'111001111001111','4':'101101111001001','5':'111100111001111','6':'111100111101111','7':'111001010010010','8':'111101111101111','9':'111101111001111','+':'000010111010000'};
+function drawNum(t,x,y,col,sc=2){
+  t=String(t);const w=t.length*4*sc;x=Math.round(x-w/2);y=Math.round(y);
+  for(const[ox,oy,k]of[[1,0,'#000'],[-1,0,'#000'],[0,1,'#000'],[0,-1,'#000'],[0,0,col]]){
+    c.fillStyle=k;
+    [...t].forEach((ch,i)=>{const m=DIGITS[ch];if(!m)return;for(let r=0;r<5;r++)for(let q=0;q<3;q++)if(m[r*3+q]==='1')c.fillRect(x+i*4*sc+q*sc+ox,y+r*sc+oy,sc,sc)});
+  }
+}
+
+/* ---------- Panel UI ---------- */
+function statusTags(){
+  const out=[];
+  for(const k of CROP_IDS){const n=setCount(k);if(n>=2)out.push(`<span class="set">ชุด${CROPS[k].name} ${n}/3: ${n===3?CROPS[k].set3:CROPS[k].set2}</span>`)}
+  if(bt){const s=bt.status;if(s.poison>0)out.push(`<span class="bad">ติดพิษ ${s.poison} เทิร์น</span>`);if(s.blind>0)out.push(`<span class="bad">ตาพร่า ${s.blind} เทิร์น</span>`);if(s.stun)out.push('<span class="bad">มึนงง</span>');if(bt.guard)out.push('<span>ป้องกัน</span>')}
+  return out.join('');
+}
+function renderStatus(){
+  if(!G){$('#status').innerHTML='';$('#info').textContent='';$('#seeds').innerHTML='';return}
+  const mh=maxHP(),mp=maxPW();
+  G.hp=Math.min(G.hp,mh);G.pw=Math.min(G.pw,mp);
+  $('#status').innerHTML=`<div class="row"><b>ชาวนา Lv ${G.lv}</b><small>EXP ${G.xp}/${xpNext()}</small></div>
+    <div class="row"><small>HP ${G.hp}/${mh}</small><small>พลัง ${G.pw}/${mp}</small></div>
+    <div class="bar hp ${G.hp/mh<.3?'low':''}"><i style="width:${G.hp/mh*100}%"></i></div>
+    <div class="bar pw"><i style="width:${G.pw/mp*100}%"></i></div>
+    <div class="tags">${statusTags()}</div>`;
+  $('#info').innerHTML=`วันที่ ${G.day} · <span class="m">หมอกระดับ ${mist()}</span> · <b>${G.gold} G</b> · เศษอุกกาบาต ${G.shards}`;
+}
+function renderSeeds(){
+  const box=$('#seeds');
+  if(!G||mode!=='map'){box.innerHTML='';return}
+  box.innerHTML='';
+  CROP_IDS.forEach(k=>{const b=document.createElement('button');b.type='button';b.textContent=`เมล็ด${CROPS[k].name} ${G.seeds[k]}`;
+    if(G.sel===k)b.className='on';b.addEventListener('click',()=>{G.sel=k;sfx.move();renderSeeds();cv.focus({preventScroll:true})});box.appendChild(b)});
+}
+function setMsg(t,who=''){$('#msg').textContent=t;$('#who').textContent=who;$('#hint').textContent=''}
+let UI=null;
+function choose(items,o={}){
+  return new Promise(res=>{
+    const list=o.cancel?[...items,{label:'◂ กลับ',value:null}]:items;
+    let sel=Math.max(0,list.findIndex(i=>!i.disabled));
+    const box=$('#menu');box.innerHTML='';box.style.gridTemplateColumns=o.cols?`repeat(${o.cols},minmax(0,1fr))`:'';
+    const paint=(s=true)=>{[...box.children].forEach((b,i)=>b.classList.toggle('sel',i===sel));if(s)box.children[sel]?.scrollIntoView({block:'nearest'})};
+    const done=v=>{UI=null;box.innerHTML='';res(v)};
+    const confirm=()=>{const it=list[sel];if(!it||it.disabled){sfx.back();return}sfx.ok();if(it.run)it.run();done(it.value)};
+    list.forEach((it,i)=>{const b=document.createElement('button');b.type='button';
+      b.innerHTML='<span></span>'+(it.sub?'<small></small>':'');b.firstChild.textContent=it.label;if(it.sub)b.lastChild.textContent=it.sub;
+      if(it.disabled)b.setAttribute('aria-disabled','true');
+      b.addEventListener('pointerenter',()=>{if(sel!==i&&!it.disabled){sel=i;paint(false)}});
+      b.addEventListener('click',()=>{sel=i;confirm()});box.appendChild(b)});
+    UI={move(dx,dy){const cols=o.cols||1,n=list.length;let s=sel;
+        for(let k=0;k<n;k++){s=dy?(s+dy*cols+n*cols)%n:(s+dx+n)%n;if(!list[s].disabled)break}
+        if(s!==sel){sel=s;sfx.move();paint()}},
+      confirm,cancel(){if(o.cancel){sfx.back();done(null)}}};
+    paint();
+  });
+}
+async function say(text,who=''){setMsg(text,who);await choose([{label:'ถัดไป',value:1}])}
+function setOver(html){$('#over').innerHTML=html}
+function showPad(on){$('#pad').classList.toggle('show',on)}
+
+/* ---------- Farm ---------- */
+const DIRS={up:[0,-1],down:[0,1],left:[-1,0],right:[1,0]};
+const tileAt=(x,y)=>MAP[y]&&MAP[y][x]||null;
+function blocked(x,y){const t=tileAt(x,y);return !t||SOLID.includes(t)}
+const facing=()=>{const[d,e]=DIRS[P.dir];return[P.x+d,P.y+e]};
+function describe(x,y){
+  const t=tileAt(x,y),p=plotAt(x,y);
+  if(p){
+    if(!p.unlocked)return 'ที่ดินยังไม่ได้ซื้อ ซื้อเพิ่มได้ที่ร้าน';
+    const s=G.plots[p.i];if(!s.c)return G.seeds[G.sel]>0?`Enter: ปลูก${CROPS[G.sel].name}`:`เมล็ด${CROPS[G.sel].name}หมด ซื้อได้ที่ร้าน`;
+    const k=CROPS[s.c];if(s.g>=k.days)return `Enter: เก็บเกี่ยว${k.name}`;
+    return s.w?`${k.name} รดน้ำแล้ว อีก ${k.days-s.g} วันจะโต`:`Enter: รดน้ำ${k.name}`;
+  }
+  if(t==='D')return 'Enter: เข้านอน ไปวันถัดไป';
+  if(t==='a'||t==='c')return 'Enter: ซื้อของที่ร้าน';
+  if(t==='b')return 'Enter: ขายผัก';
+  if(t==='M')return 'Enter: ดูอุกกาบาต';
+  if(t==='o')return 'Enter: ดูบ่อน้ำ';
+  if(t==='~')return 'Enter: ดูบ่อปลา';
+  return null;
+}
+function mapHint(){
+  if(!G||mode!=='map')return;
+  const[x,y]=facing(),d=describe(x,y);
+  $('#who').textContent='';
+  $('#hint').textContent=d||'คลิกช่องบนจอเพื่อเดินไปทำงาน หรือใช้ลูกศร · Enter ทำงาน · 1-3 เลือกเมล็ด · X เมนู';
+}
+function note(t){$('#msg').textContent=t}
+function burstMap(x,y,col,n=8){for(let i=0;i<(CALM?3:n);i++){const a=rand(0,TAU),s=rand(10,40);fxMap.push({x:x*T+8,y:y*T+8,vx:Math.cos(a)*s,vy:Math.sin(a)*s-16,life:rand(.25,.5),col})}}
+function act(x,y){
+  if(mode!=='map')return;
+  const t=tileAt(x,y),p=plotAt(x,y);
+  if(p){
+    if(!p.unlocked){note('ที่ดินแปลงนี้ยังไม่ใช่ของเรา ซื้อเพิ่มได้ที่ร้าน');sfx.back();return}
+    const s=G.plots[p.i];
+    if(!s.c){
+      if(G.seeds[G.sel]<=0){note(`เมล็ด${CROPS[G.sel].name}หมด ไปซื้อที่ร้านได้`);sfx.back();return}
+      G.seeds[G.sel]--;s.c=G.sel;s.g=0;s.w=false;sfx.plant();burstMap(x,y,'#a4d96c',5);note(`ปลูก${CROPS[s.c].name}แล้ว อย่าลืมรดน้ำ`);renderSeeds();mapHint();saveSoon();return;
+    }
+    if(s.g>=CROPS[s.c].days)return harvest(p,x,y);
+    if(s.w){note(`${CROPS[s.c].name}รดน้ำแล้ว รอพรุ่งนี้`);return}
+    waterAt(p);sfx.water();mapHint();saveSoon();return;
+  }
+  if(t==='D')return script(sleep);
+  if(t==='a'||t==='c')return script(shop);
+  if(t==='b')return script(sell);
+  if(t==='M')return script(()=>say('อุกกาบาตลูกนี้ตกลงมาพร้อมกับลูกอื่นทั่วโลก หมอกสีม่วงยังซึมออกมาไม่หยุด'));
+  if(t==='o')return script(()=>say('น้ำในบ่อยังใสดี ที่นี่ปลอดภัยจากหมอกอยู่ แค่ยังไม่รู้ว่าจะอีกนานแค่ไหน'));
+  if(t==='~')return script(()=>say('บ่อปลาว่างเปล่า ไว้วันหลังค่อยปล่อยปลาลงไป'));
+}
+function waterAt(p){
+  const range=G.can?1:0;
+  for(let b=p.b-range;b<=p.b+range;b++)for(let a=p.a-range;a<=p.a+range;a++){
+    if(a<0||b<0||a>=landSize()||b>=landSize())continue;
+    const s=G.plots[b*6+a];if(s.c&&s.g<CROPS[s.c].days&&!s.w){s.w=true;burstMap(PX+a,PY+b,'#7fb8e8',6)}
+  }
+  note(range?'รดน้ำรอบ ๆ เรียบร้อย':'รดน้ำเรียบร้อย');
+}
+function harvest(p,x,y){
+  const s=G.plots[p.i],kind=s.c;
+  const safe=G.harvests<2;
+  const chance=safe?0:Math.min(.45,.10+.015*(mist()-1)+G.pity*.015);
+  G.harvests++;
+  if(Math.random()<chance){
+    G.pity=0;
+    const rare=Math.random()<.1;
+    return script(()=>encounter(p,kind,rare,x,y));
+  }
+  G.pity++;
+  s.c=null;s.g=0;s.w=false;G.veg[kind]++;
+  sfx.harvest();burstMap(x,y,'#ffcf6b',8);
+  note(`เก็บ${CROPS[kind].name}ได้ 1 ลูก รวมในกระเป๋า ${G.veg[kind]}`);
+  gainXP(1,true);renderStatus();mapHint();saveSoon();
+}
+async function encounter(p,kind,rare,x,y){
+  showPad(false);
+  sfx.enc();shake=4;
+  setMsg(`${CROPS[kind].name}ต้นนี้ดิ้นอยู่ในดิน!`);
+  plotShake={i:p.i,t:.8};
+  await wait(800);
+  G.plots[p.i].c=null;G.plots[p.i].g=0;G.plots[p.i].w=false;
+  const res=await battle(kind,rare);
+  if(res==='win'||res==='boom'){saveSoon();return}
+  const near=[];
+  for(let b=p.b-1;b<=p.b+1;b++)for(let a=p.a-1;a<=p.a+1;a++){
+    if(a<0||b<0||a>=6||b>=6||(a===p.a&&b===p.b))continue;
+    if(G.plots[b*6+a].c)near.push(b*6+a);
+  }
+  near.sort(()=>Math.random()-.5);
+  const gone=near.slice(0,3);gone.forEach(i=>{G.plots[i]={c:null,g:0,w:false}});
+  if(res==='lose'){
+    await say(gone.length?`มอนสเตอร์ทำลายผักข้าง ๆ ไป ${gone.length} ต้น แล้วหายเข้าไปในหมอก เราสลบไปจนเช้า`:'มอนสเตอร์หายเข้าไปในหมอก เราสลบไปจนเช้า');
+    await nextDay(.5);
+  }else{
+    await say(gone.length?`มอนสเตอร์ทำลายผักข้าง ๆ ไป ${gone.length} ต้นก่อนหายไป`:'มอนสเตอร์หายเข้าไปในหมอก ผักรอบข้างยังปลอดภัย');
+  }
+  saveSoon();
+}
+let plotShake=null;
+async function nextDay(hpRatio=1){
+  await fadeTo(1,300);
+  const L0=mist();
+  G.day++;
+  for(const s of G.plots){if(s.c&&s.w&&s.g<CROPS[s.c].days)s.g++;s.w=false}
+  G.hp=Math.max(1,Math.round(maxHP()*hpRatio));G.pw=maxPW();
+  save();renderStatus();
+  await fadeTo(0,300);
+  if(mist()>L0){await say(`หมอกหนาขึ้นเป็นระดับ ${mist()} ผักกลายพันธุ์ง่ายขึ้น และมอนสเตอร์ก็แรงขึ้น`)}
+}
+async function sleep(){
+  setMsg('เข้านอนเลยไหม? ผักที่รดน้ำแล้วจะโตขึ้นในวันพรุ่งนี้');
+  const a=await choose([{label:'นอนเลย',value:1},{label:'ไว้ก่อน',value:0}]);
+  if(a){await nextDay(1);note(`เช้าวันที่ ${G.day} แล้ว`)}
+}
+async function shop(){
+  for(;;){
+    setMsg('ร้านของชำริมทาง ซื้ออะไรดี?','เจ้าของร้าน');
+    const list=[];
+    for(const k of CROP_IDS){const i=CROPS[k];
+      list.push({label:`เมล็ด${i.name} (มี ${G.seeds[k]})`,sub:`${i.seed} G · โต ${i.days} วัน · ขาย ${i.sell} G`,value:{seed:k,n:1},disabled:G.gold<i.seed});
+      list.push({label:`เมล็ด${i.name} × 5`,sub:`${i.seed*5} G`,value:{seed:k,n:5},disabled:G.gold<i.seed*5});}
+    const skCost=60*(G.sickle+1),skS=G.sickle;
+    list.push({label:`ลับเครื่องมือ ขั้น ${G.sickle+1}`,sub:`โจมตี +2 · ${skCost} G${skS?` · เศษ ${skS}`:''}`,value:{up:'sickle',g:skCost,s:skS},disabled:G.gold<skCost||G.shards<skS});
+    if(!G.can)list.push({label:'บัวรดน้ำใบใหญ่',sub:'รดน้ำ 3×3 · 250 G · เศษ 2',value:{up:'can',g:250,s:2},disabled:G.gold<250||G.shards<2});
+    if(G.land<2){const g=G.land?500:200;list.push({label:`ซื้อที่ดินเป็น ${5+G.land}×${5+G.land}`,sub:`${g} G`,value:{up:'land',g,s:0},disabled:G.gold<g})}
+    const v=await choose(list,{cancel:true});
+    if(!v)return;
+    if(v.seed){G.gold-=CROPS[v.seed].seed*v.n;G.seeds[v.seed]+=v.n}
+    else{G.gold-=v.g;G.shards-=v.s;G[v.up]++}
+    sfx.coin();renderStatus();saveSoon();
+  }
+}
+async function sell(){
+  for(;;){
+    const total=CROP_IDS.reduce((a,k)=>a+G.veg[k]*CROPS[k].sell,0);
+    setMsg(total?`ผักในกระเป๋าขายได้รวม ${total} G`:'ยังไม่มีผักให้ขาย ไปเก็บเกี่ยวก่อน');
+    const list=[{label:'ขายทั้งหมด',sub:`${total} G`,value:'all',disabled:!total},...CROP_IDS.map(k=>({label:`${CROPS[k].name} × ${G.veg[k]}`,sub:`ลูกละ ${CROPS[k].sell} G`,value:k,disabled:!G.veg[k]}))];
+    const v=await choose(list,{cancel:true});
+    if(!v)return;
+    if(v==='all'){G.gold+=total;CROP_IDS.forEach(k=>G.veg[k]=0)}else{G.gold+=CROPS[v].sell;G.veg[v]--}
+    sfx.coin();renderStatus();saveSoon();
+  }
+}
+function gainXP(n,quiet){
+  G.xp+=n;let up=false;
+  while(G.xp>=xpNext()){G.xp-=xpNext();G.lv++;up=true;G.hp=maxHP();G.pw=maxPW()}
+  if(up){sfx.heal();if(quiet)note(`เลเวลอัปเป็น Lv ${G.lv}! HP และพลังฟื้นเต็ม`)}
+  return up;
+}
+function fieldMenu(){
+  if(mode!=='map'||P.moving)return;
+  script(async()=>{
+    for(;;){
+      setMsg('เมนู');
+      const a=await choose([{label:'ชุดและอาวุธ',value:'gear'},{label:'กินผัก',value:'eat'},{label:'สมุดผัก',value:'book'},{label:'สำรองเซฟ',value:'code'},{label:'เล่นต่อ',value:'close'}],{cols:2});
+      if(a==='close')return;
+      if(a==='gear')await gearMenu();
+      if(a==='eat')await eatMenu();
+      if(a==='book')await bookMenu();
+      if(a==='code')await backupPanel();
+    }
+  });
+}
+async function backupPanel(){
+  const box=$('#savecode'),code=exportCode();
+  save();box.value=code;box.readOnly=true;box.hidden=false;
+  setMsg('คัดลอกรหัสนี้เก็บไว้ในโน้ต ถ้าเซฟหายหรือย้ายเครื่อง ใส่รหัสนี้ที่หน้าแรกเพื่อเล่นต่อ');
+  $('#hint').textContent='รหัสเก็บความคืบหน้าถึงตอนนี้ ควรสำรองใหม่หลังเล่นไปสักพัก';
+  const v=await choose([{label:'คัดลอกรหัส',value:'copy',run(){
+    const failed=()=>{box.focus();box.select();$('#hint').textContent='คัดลอกอัตโนมัติไม่ได้ เลือกข้อความให้แล้ว กด Ctrl+C หรือคัดลอกเอง'};
+    try{navigator.clipboard.writeText(code).then(()=>{$('#hint').textContent='คัดลอกรหัสแล้ว เก็บไว้ในโน้ตได้เลย'},failed)}catch(e){failed()}
+  }}],{cancel:true});
+  if(v==='copy'){await choose([{label:'เรียบร้อย',value:1}]);}
+  box.hidden=true;box.value='';
+}
+async function importPanel(){
+  const box=$('#savecode');box.value='';box.readOnly=false;box.hidden=false;
+  setMsg('วางรหัสเซฟในช่องนี้ แล้วกดโหลดเซฟ');
+  box.focus({preventScroll:true});
+  for(;;){
+    const v=await choose([{label:'โหลดเซฟนี้',value:'load'}],{cancel:true});
+    if(!v){box.hidden=true;box.value='';return null}
+    const g=importCode(box.value);
+    if(g){box.hidden=true;box.value='';return g}
+    sfx.back();setMsg('รหัสนี้ใช้ไม่ได้ ตรวจว่าคัดลอกมาครบและขึ้นต้นด้วย MG1-');
+  }
+}
+function eatList(){return CROP_IDS.filter(k=>G.veg[k]>0).map(k=>({label:`${CROPS[k].name} × ${G.veg[k]}`,sub:`HP +${CROPS[k].eat}`,value:k}))}
+function eatVeg(k){G.veg[k]--;const v=Math.min(CROPS[k].eat,maxHP()-G.hp);G.hp+=v;return v}
+async function eatMenu(){
+  for(;;){
+    const l=eatList();if(!l.length){setMsg('ไม่มีผักในกระเป๋า');await wait(800);return}
+    setMsg(`กินอะไรดี? HP ${G.hp}/${maxHP()}`);
+    const v=await choose(l,{cancel:true});if(!v)return;
+    eatVeg(v);sfx.heal();renderStatus();saveSoon();
+  }
+}
+async function gearMenu(){
+  for(;;){
+    setMsg(`โจมตี ${Math.round(atkOf())} · ป้องกัน ${Math.round(defOf())} · HP สูงสุด ${maxHP()}`);
+    const slot=await choose(SLOTS.map(s=>({label:SLOT_NAME[s],sub:G.equip[s]?itemName(G.equip[s])+` +${(G.items[G.equip[s]]||1)-1}`:'ยังไม่ได้ใส่',value:s})),{cancel:true});
+    if(!slot)return;
+    const owned=Object.keys(G.items).filter(i=>itemSlot(i)===slot);
+    if(!owned.length){setMsg('ยังไม่มีของในช่องนี้ ชนะมอนสเตอร์ผักเพื่อรับของ');await wait(1100);continue}
+    setMsg(`เลือก${SLOT_NAME[slot]}ที่จะใส่`);
+    const v=await choose([{label:'ถอดออก',value:'off',disabled:!G.equip[slot]},...owned.map(i=>({label:`${itemName(i)} +${G.items[i]-1}`,sub:`ชุด${CROPS[itemCrop(i)].name}${G.equip[slot]===i?' · ใส่อยู่':''}`,value:i}))],{cancel:true});
+    if(!v)continue;
+    G.equip[slot]=v==='off'?null:v;sfx.ok();renderStatus();saveSoon();
+  }
+}
+async function bookMenu(){
+  for(;;){
+    setMsg('สมุดผัก เลือกผักเพื่ออ่านข้อมูล');
+    const k=await choose(CROP_IDS.map(k=>{const s=G.seen[k],own=SLOTS.filter(o=>G.items[itemId(k,o)]).length;return{label:CROPS[k].name,sub:`ชนะ ${s.n} · ร่างทอง ${s.rare} · ของ ${own}/3`,value:k}}),{cancel:true});
+    if(!k)return;
+    const i=CROPS[k],m=MONSTERS[k],s=G.seen[k];
+    await say(i.fact,CROPS[k].name);
+    await say(`ในเกมขยายเกินจริงเป็นพลัง${i.power} ใส่ 2 ชิ้น: ${i.set2} · ใส่ 3 ชิ้น: ${i.set3}`,'พลังในเกม');
+    await say(s.n||s.rare?`${m.name} ชนะแล้ว ${s.n} ครั้ง และร่างทอง ${s.rare} ครั้ง`:'ยังไม่เคยเอาชนะมอนสเตอร์จากผักชนิดนี้','บันทึกการต่อสู้');
+  }
+}
+async function fadeTo(v,ms=220){const s=fade,t0=performance.now();for(;;){const k=Math.min(1,(performance.now()-t0)/ms);fade=s+(v-s)*k;if(k>=1)break;await wait(16)}}
+function script(fn){if(mode!=='map')return;mode='script';showPad(false);held.length=0;P.path=null;renderSeeds();
+  Promise.resolve().then(fn).catch(e=>console.error(e)).finally(()=>{if(mode==='script'){mode='map';showPad(true);renderSeeds();renderStatus();mapHint()}})}
+
+/* ---------- Battle ---------- */
+let bt=null,BG=null;
+function fieldBg(){
+  if(BG)return BG;
+  const e=mk(W,H),g=e.getContext('2d'),r=seeded(41);
+  const F=(x,y,w,h,k)=>{g.fillStyle=k;g.fillRect(x,y,w,h)};
+  F(0,0,W,H,'#6d5a92');F(0,30,W,30,'#7f6ba3');F(0,60,W,20,'#9483b3');
+  for(let i=0;i<22;i++){const x=r()*W|0,w=16+r()*24|0,h=14+r()*24|0;F(x,86-h,w,h+2,'#4f6a58')}
+  for(let x=4;x<W;x+=26){F(x,74,3,18,'#6d4f33');}F(0,78,W,2,'#8a6a45');F(0,85,W,2,'#8a6a45');
+  F(0,92,W,148,'#6a4e32');for(let y=100;y<H;y+=14){F(0,y,W,2,'#5a4129');F(0,y+2,W,1,'#7c5c3a')}
+  for(let i=0;i<220;i++)F(r()*W|0,92+r()*148|0,2,1,r()>.5?'#7c5c3a':'#533b25');
+  for(let i=0;i<14;i++){const x=r()*W|0,y=100+r()*130|0;F(x,y,2,4,'#4fae56');F(x-2,y,2,2,'#4fae56');F(x+2,y-1,2,2,'#2f7f3e')}
+  return BG=e;
+}
+const FARM_POS={x:250,y:128};
+const pos=who=>who==='e'?{x:bt.e.px,y:bt.e.py}:{x:FARM_POS.x-(bt.active==='p'?12:0),y:FARM_POS.y};
+function burst(x,y,col,n=14){if(CALM)n=5;for(let i=0;i<n;i++){const a=rand(0,TAU),s=rand(20,70);bt.fx.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s-20,life:rand(.3,.6),col,z:(rand(1,3)|0)||1})}}
+function pop(who,n,col='#ffffff'){const p=pos(who);bt.floats.push({x:p.x,y:p.y-28,t:0,n,col})}
+const log=async(t,ms=720)=>{setMsg(t);await wait(ms)};
+function hurtEnemy(d,col){
+  d=Math.max(1,Math.round(d));const e=bt.e;e.hp=Math.max(0,e.hp-d);bt.eflash=.22;bt.shake=2;pop('e',d);burst(e.px,e.py,col||'#fff',10);return d;
+}
+function hurtPlayer(d,col){
+  d=Math.max(1,Math.round(d));if(bt.guard)d=Math.max(1,Math.round(d/2));
+  G.hp=Math.max(0,G.hp-d);bt.pflash=.22;bt.shake=CALM?0:4;pop('p',d);const p=pos('p');burst(p.x,p.y,col||'#fff',10);renderStatus();return d;
+}
+function tryStatus(name,turns){
+  const n=setCount('pumpkin');
+  if(n>=3||(n===2&&Math.random()<.5)){return false}
+  bt.status[name]=turns;renderStatus();return true;
+}
+function playerAttack(mult){
+  const carrot=setCount('carrot');
+  const hit=carrot>=3?1:bt.status.blind>0?.55:.92;
+  if(Math.random()>hit)return{miss:true};
+  const crit=Math.random()<.08+(carrot>=2?.15:0);
+  const d=(atkOf()*mult*rand(.92,1.08)-bt.e.def/2)*(crit?(carrot>=3?2:1.6):1);
+  return{d,crit};
+}
+async function playerTurn(){
+  const s=bt.status;bt.guard=false;bt.active='p';renderStatus();
+  const tomato=setCount('tomato');
+  if(tomato>=2&&G.hp<maxHP()){const v=Math.min(tomato>=3?4:2,maxHP()-G.hp);G.hp+=v;pop('p','+'+v,'#7fd483');renderStatus();await wait(300)}
+  if(s.poison>0){s.poison--;const d=Math.max(1,Math.round(maxHP()*.06));G.hp=Math.max(0,G.hp-d);bt.pflash=.22;pop('p',d,'#c98cff');renderStatus();await log('พิษเริ่มออกฤทธิ์',520);if(G.hp<=0)return}
+  if(s.blind>0)s.blind--;
+  if(s.stun){s.stun=false;renderStatus();await log('ยังมึนงงอยู่ ขยับไม่ได้',760);return}
+  renderStatus();
+  for(;;){
+    setMsg('จะทำอะไรดี?',`เทิร์นที่ ${bt.round}`);
+    const cmd=await choose([{label:'โจมตี',value:'atk'},{label:'สกิล',value:'skill'},{label:'กินผัก',value:'eat',disabled:!CROP_IDS.some(k=>G.veg[k]>0)},{label:'ป้องกัน',value:'guard'},{label:'หนี',value:'flee'}],{cols:2});
+    if(cmd==='atk'){
+      bt.plunge=.25;const r=playerAttack(1);
+      if(r.miss){sfx.miss();await log('ตีพลาด!',620);break}
+      r.crit?sfx.crit():sfx.hit();setMsg(r.crit?'คริติคอล! โดนจุดสำคัญเต็ม ๆ':`โจมตี${bt.e.name}`);hurtEnemy(r.d);await wait(620);break;
+    }
+    if(cmd==='skill'){
+      setMsg(`ใช้สกิลอะไร? พลัง ${G.pw}/${maxPW()}`);
+      const sk=await choose([{label:'ฟันเต็มแรง',sub:'โจมตี 1.8 เท่า · พลัง 3',value:'slash',disabled:G.pw<3},{label:'ตั้งหลัก',sub:'ฟื้น HP 25% · พลัง 4',value:'rest',disabled:G.pw<4}],{cancel:true});
+      if(!sk)continue;
+      if(sk==='slash'){
+        G.pw-=3;renderStatus();bt.plunge=.25;const r=playerAttack(1.8);
+        if(r.miss){sfx.miss();await log('ฟันพลาด!',620);break}
+        sfx.crit();setMsg(r.crit?'ฟันเต็มแรงเข้าจุดสำคัญ!':'ฟันเต็มแรง!');hurtEnemy(r.d,'#ffcf6b');await wait(640);break;
+      }
+      G.pw-=4;const v=Math.min(Math.round(maxHP()*.25),maxHP()-G.hp);G.hp+=v;sfx.heal();pop('p','+'+v,'#7fd483');const p=pos('p');burst(p.x,p.y,'#7fd483',12);renderStatus();await log('ตั้งหลักหายใจลึก ๆ',620);break;
+    }
+    if(cmd==='eat'){
+      setMsg(`กินอะไรดี? HP ${G.hp}/${maxHP()}`);
+      const k=await choose(eatList(),{cancel:true});if(!k)continue;
+      const v=eatVeg(k);sfx.heal();pop('p','+'+v,'#7fd483');const p=pos('p');burst(p.x,p.y,'#7fd483',12);renderStatus();await log(`กิน${CROPS[k].name} ฟื้น HP ${v}`,620);break;
+    }
+    if(cmd==='guard'){bt.guard=true;G.pw=Math.min(maxPW(),G.pw+1);renderStatus();await log('ตั้งท่าป้องกัน รับความเสียหายครึ่งเดียว และได้พลังคืน 1',620);break}
+    if(cmd==='flee'){
+      if(Math.random()<.65){await log('หนีออกมาได้!',600);bt.fled=true;return}
+      await log('หนีไม่พ้น!',600);break;
+    }
+  }
+  bt.active=null;renderStatus();
+}
+async function enemyTurn(){
+  const e=bt.e;bt.active='e';e.turns++;
+  const hit=(mult=1)=>e.atk*mult*rand(.9,1.1)-defOf()/2;
+  if(e.kind==='tomato'){
+    if(e.charging){
+      e.charging=false;sfx.boom();setMsg('ตูม! มะเขือเทศระเบิดกระจาย!');burst(e.px,e.py,'#d9413f',40);hurtPlayer(hit(2.6),'#ff8a7a');e.hp=0;bt.boom=true;await wait(1000);return;
+    }
+    if(e.turns>=3||e.hp<e.maxhp*.5){e.charging=true;sfx.enc();await log(`${e.name}บวมเป่ง! ฆ่ามันให้ทันในเทิร์นนี้ หรือสั่งป้องกัน`,1200);bt.active=null;return}
+    if(Math.random()<.35){setMsg(`${e.name}พ่นน้ำเปรี้ยว!`);sfx.hit();bt.elunge=.25;hurtPlayer(hit(.6),'#c98cff');const ok=tryStatus('poison',3);await log(ok?'ติดพิษ 3 เทิร์น!':'ภูมิคุ้มกันกันพิษไว้ได้!',720);bt.active=null;return}
+  }
+  if(e.kind==='carrot'){
+    const r=Math.random();
+    if(r<.3){setMsg(`${e.name}ทิ่มรัว 2 ครั้ง!`);bt.elunge=.25;sfx.hit();hurtPlayer(hit(.6));await wait(260);sfx.hit();bt.elunge=.25;hurtPlayer(hit(.6));await wait(520);bt.active=null;return}
+    if(r<.5){setMsg(`${e.name}สะบัดดินใส่หน้า!`);bt.elunge=.25;hurtPlayer(hit(.4));const ok=tryStatus('blind',3);await log(ok?'ตาพร่า ตีพลาดง่ายขึ้น 3 เทิร์น!':'ภูมิคุ้มกันกันไว้ได้!',760);bt.active=null;return}
+  }
+  if(e.kind==='pumpkin'){
+    if(e.charging){
+      e.charging=false;setMsg(`${e.name}ทุบลงมาเต็มแรง!`);sfx.crit();bt.elunge=.3;hurtPlayer(hit(1.6));
+      if(!bt.guard&&G.hp>0){const ok=tryStatus('stun',true);await log(ok?'มึนงง เสียเทิร์นถัดไป!':'ภูมิคุ้มกันดี ไม่มึนงง!',800)}else await wait(760);
+      bt.active=null;return;
+    }
+    if(e.turns%3===0){e.charging=true;sfx.enc();await log(`${e.name}ง้างตัวขึ้นสูง! เทิร์นหน้าควรสั่งป้องกัน`,1200);bt.active=null;return}
+  }
+  bt.elunge=.25;sfx.hit();setMsg(`${e.name}โจมตี${bt.guard?' แต่กันไว้ได้':''}`);hurtPlayer(hit());await wait(620);bt.active=null;
+}
+async function battle(kind,rare){
+  const L=mist(),m=MONSTERS[kind],sc=(1+.15*(L-1))*(rare?1.5:1);
+  await fadeTo(1,160);
+  const e={kind,rare,name:(rare?`${CROPS[kind].name}ทองคำ`:m.name),maxhp:Math.round(m.hp*sc),hp:Math.round(m.hp*sc),atk:m.atk*sc,def:m.def*sc,spd:m.spd,xp:Math.round(m.xp*sc*(rare?2:1)),gold:Math.round(m.gold*sc*(rare?2:1)),px:92,py:122,turns:0,charging:false};
+  bt={e,fx:[],floats:[],round:1,active:null,shake:0,eflash:0,pflash:0,elunge:0,plunge:0,fled:false,boom:false,guard:false,status:{poison:0,blind:0,stun:false}};
+  mode='battle';renderSeeds();renderStatus();
+  await fadeTo(0,160);
+  await log(rare?`ร่างหายาก! ${e.name}โผล่ออกมาจากดิน!`:`${e.name}โผล่ออกมาจากดิน!`,800);
+  let res=null;
+  outer:for(;;){
+    const order=[{w:'p',s:6+rand(0,4)},{w:'e',s:e.charging?-99:e.spd+rand(0,4)}].sort((a,b)=>b.s-a.s);
+    for(const o of order){
+      if(o.w==='p')await playerTurn();else await enemyTurn();
+      if(bt.fled){res='flee';break outer}
+      if(G.hp<=0){res='lose';break outer}
+      if(e.hp<=0){res=bt.boom?'boom':'win';break outer}
+    }
+    bt.round++;
+  }
+  bt.active=null;
+  if(res==='win')await victory(e);
+  if(res==='boom')await say(`${e.name}ระเบิดไปแล้ว ของดรอปกระจุยหมด เก็บได้แค่ทอง ${Math.round(e.gold/2)} G`),G.gold+=Math.round(e.gold/2),renderStatus();
+  if(res==='lose')await say('หมดแรงแล้ว...');
+  await fadeTo(1,160);
+  bt=null;mode='script';renderStatus();
+  await fadeTo(0,160);
+  return res;
+}
+async function victory(e){
+  sfx.win();
+  G.gold+=e.gold;
+  G.seen[e.kind][e.rare?'rare':'n']++;
+  const shards=e.rare?2:Math.random()<.25?1:0;G.shards+=shards;
+  const up=gainXP(e.xp);renderStatus();
+  await say(`ชนะแล้ว! ได้ ${e.xp} EXP และ ${e.gold} G${shards?` และเศษอุกกาบาต ${shards} ชิ้น`:''}`);
+  if(up)await say(`เลเวลอัปเป็น Lv ${G.lv}! HP และพลังฟื้นเต็ม`);
+  // First win per crop always drops; after that 50%, guaranteed by the third win in a row without one.
+  G.dropMiss=G.dropMiss||{};
+  const missed=G.dropMiss[e.kind]||0,owned=SLOTS.some(s=>G.items[itemId(e.kind,s)]);
+  const drop=e.rare||!owned||missed>=2||Math.random()<.5;
+  G.dropMiss[e.kind]=drop?0:missed+1;
+  if(drop)await dropItem(e.kind);
+}
+async function dropItem(kind){
+  const missing=SLOTS.filter(s=>!G.items[itemId(kind,s)]);
+  const slot=missing.length&&Math.random()<.7?pick(missing):pick(SLOTS);
+  const id=itemId(kind,slot),name=itemName(id);
+  sfx.coin();
+  if(!G.items[id]){
+    G.items[id]=1;
+    setMsg(`ได้รับ ${name}!`,'ของดรอป');
+    const a=await choose([{label:'ใส่เลย',value:1},{label:'เก็บไว้ก่อน',value:0}]);
+    if(a){G.equip[slot]=id;renderStatus()}
+    const n=SLOTS.filter(s=>G.items[itemId(kind,s)]).length;
+    if(n===2)await say(`รู้จักชุด${CROPS[kind].name}แล้ว ใส่ 2 ชิ้นได้โบนัส ${CROPS[kind].set2}`,'ชุดไอเทม');
+    return;
+  }
+  if(G.items[id]<6){G.items[id]++;renderStatus();await say(`ได้ ${name} ซ้ำ นำมาหลอมเป็น +${G.items[id]-1} แล้ว`,'ของดรอป');return}
+  G.gold+=20;renderStatus();await say(`${name} เต็มขั้นแล้ว ขายได้ 20 G`,'ของดรอป');
+}
+
+/* ---------- Title ---------- */
+async function titleScreen(){
+  mode='title';G=null;bt=null;fade=0;renderStatus();showPad(false);
+  setOver('<h1>สวนในหมอก</h1><p>ปลูกผัก เก็บเกี่ยว และลุ้นว่าต้นไหนจะลุกขึ้นมาสู้</p>');
+  setMsg('เลือกเมนูเพื่อเริ่มเล่น');
+  $('#hint').textContent='คีย์บอร์ด: ลูกศรเลื่อน · Enter เลือก · X กลับ';
+  let s,v;
+  const enter=g=>{setOver('');G=g;Object.assign(P,{x:g.x,y:g.y,fx:g.x,fy:g.y,path:null,moving:false});save();renderStatus();mode='map';renderSeeds();showPad(true);note('กลับมาที่ฟาร์มแล้ว');mapHint()};
+  for(;;){
+    s=loadSave();
+    setMsg('เลือกเมนูเพื่อเริ่มเล่น');
+    $('#hint').textContent='คีย์บอร์ด: ลูกศรเลื่อน · Enter เลือก · X กลับ';
+    v=await choose([...(s?[{label:'เล่นต่อ',sub:`วันที่ ${s.day} · Lv ${s.lv} · ${s.gold} G`,value:'load'}]:[]),{label:'ใส่รหัสเซฟ',sub:'โหลดเซฟที่สำรองไว้',value:'code'},{label:'เริ่มฟาร์มใหม่',value:'new'},{label:'เริ่มที่วันที่ 19',sub:'Lv 5 · 400 G · ไว้เล่นต่อเมื่อเซฟหาย',value:'mid'}]);
+    if(v==='load')return enter(s);
+    if(v==='code'){const g=await importPanel();if(g)return enter(g);continue}
+    if(s){
+      setMsg(`เซฟวันที่ ${s.day} จะถูกทับ เริ่มใหม่จริงไหม?`);
+      if(!await choose([{label:'ไม่ กลับไปก่อน',value:0},{label:'ทับเซฟเดิม',value:1}]))continue;
+    }
+    break;
+  }
+  setOver('');
+  if(v==='mid'){
+    const g=newGame();Object.assign(g,{day:19,lv:5,gold:400,land:1,harvests:40,seeds:{carrot:12,tomato:6,pumpkin:2}});
+    G=g;g.hp=maxHP();g.pw=maxPW();return enter(g);
+  }
+  G=newGame();Object.assign(P,{x:4,y:5,fx:4,fy:5,dir:'down',path:null,moving:false});renderStatus();
+  mode='script';
+  await say('เราเป็นชาวนาธรรมดา ปลูกผักขายไปวัน ๆ จนคืนหนึ่งอุกกาบาตตกลงมาตามจุดต่าง ๆ ทั่วโลก');
+  await say('หมอกสีม่วงจากอุกกาบาตปกคลุมไปทุกที่ ผักบางต้นกลายพันธุ์เป็นมอนสเตอร์ และไม่มีใครรู้ว่าเป็นต้นไหนจนกว่าจะเก็บเกี่ยว');
+  await say('ถึงอย่างนั้นชีวิตก็ต้องไปต่อ ไปปลูกแครอทที่แปลงตรงกลาง รดน้ำ แล้วเข้าบ้านไปนอน');
+  mode='map';renderSeeds();showPad(true);note('เริ่มจากคลิกที่ดินในแปลงเพื่อปลูกแครอท');mapHint();saveSoon();
+}
+
+/* ---------- Render ---------- */
+function renderMist(strength){
+  // chunky drifting lilac haze, thicker at higher mist levels
+  for(let y=0;y<H;y+=8)for(let x=0;x<W;x+=8){
+    const n=Math.sin(x*.035+time*.25)+Math.sin(y*.05-time*.18)+Math.sin((x+y)*.02+time*.11);
+    const a=Math.round(clamp((n+1.6)/4,0,1)*5)/5*strength;
+    if(a>0){c.fillStyle=`rgba(196,168,245,${a})`;c.fillRect(x,y,8,8)}
+  }
+}
+function renderFarm(){
+  const fr=Math.floor(time*2)%2;
+  for(let y=0;y<15;y++)for(let x=0;x<20;x++){
+    const ch=MAP[y][x];
+    if(ch==='~')c.drawImage(WATER[fr],x*T,y*T);
+    else if(ch==='M')c.drawImage(TILES['.'],x*T,y*T);
+    else c.drawImage(TILES[ch]||TILES['.'],x*T,y*T);
+  }
+  c.drawImage(METEOR[fr],15*T,12*T);
+  const size=G?landSize():4;
+  for(let b=0;b<6;b++)for(let a=0;a<6;a++){
+    const x=(PX+a)*T,y=(PY+b)*T;
+    if(a>=size||b>=size){c.drawImage(LOCKED,x,y);continue}
+    const s=G?G.plots[b*6+a]:{c:null,w:false};
+    c.drawImage(DIRT[s.w?1:0],x,y);
+    if(s.c){
+      const days=CROPS[s.c].days,st=s.g>=days?3:s.g===0?(s.w?1:0):Math.min(2,1+s.g);
+      let ox=0;if(plotShake&&plotShake.i===b*6+a)ox=Math.round(Math.sin(time*50)*2);
+      c.drawImage(cropArt(s.c,st),x+ox,y);
+    }
+  }
+  if(G){
+    const k=P.moving?P.t:1,cx=(P.fx+(P.x-P.fx)*k)*T,cy=(P.fy+(P.y-P.fy)*k)*T;
+    c.fillStyle='rgba(0,0,0,.3)';c.fillRect(cx+3,cy+14,10,2);
+    c.drawImage(charSprite(look(),P.dir,P.moving?(Math.floor(time*8)%2)+1:0),Math.round(cx),Math.round(cy));
+    if(mode==='map'&&!P.moving){const[fx,fy]=facing(),p=plotAt(fx,fy);if(p&&p.unlocked){c.strokeStyle='rgba(255,255,255,.55)';c.lineWidth=1;c.strokeRect(fx*T+.5,fy*T+.5,15,15)}}
+  }
+  fxMap=fxMap.filter(f=>(f.life-=1/60)>0);
+  for(const f of fxMap){f.x+=f.vx/60;f.y+=f.vy/60;f.vy+=2;c.fillStyle=f.col;c.fillRect(f.x|0,f.y|0,2,2)}
+  renderMist(G?Math.min(.34,.13+.025*mist()):.3);
+}
+function renderBattle(dt){
+  bt.shake=Math.max(0,bt.shake-dt*18);bt.eflash=Math.max(0,bt.eflash-dt);bt.pflash=Math.max(0,bt.pflash-dt);bt.elunge=Math.max(0,bt.elunge-dt);bt.plunge=Math.max(0,bt.plunge-dt);
+  const sx=bt.shake>0?rand(-bt.shake,bt.shake):0;
+  c.save();c.translate(Math.round(sx),0);
+  c.drawImage(fieldBg(),0,0);
+  const e=bt.e;
+  if(e.hp>0){
+    const set=SPC[e.kind],im=bt.eflash>0&&Math.floor(bt.eflash*30)%2===0?set.f:e.rare?set.r:set.n;
+    const sc=e.kind==='pumpkin'?5:4,swell=e.charging&&e.kind==='tomato'?1:0,w=im.width*(sc+swell),h=im.height*(sc+swell);
+    const bob=Math.round(Math.sin(time*3)*2),x=Math.round(e.px-w/2+(bt.elunge>0?14:0)+(e.charging?Math.sin(time*40):0)),y=Math.round(e.py-h/2+bob);
+    c.fillStyle='rgba(0,0,0,.3)';c.fillRect(x+w*.12|0,e.py+h/2-3|0,w*.76|0,5);
+    c.drawImage(im,x,y,w,h);
+    const bw=64,by=e.py+h/2+5|0,bx=e.px-bw/2|0;
+    c.fillStyle='#120b06';c.fillRect(bx-1,by-1,bw+2,6);
+    c.fillStyle=e.hp/e.maxhp<.3?'#ff8a70':'#7fd483';c.fillRect(bx,by,Math.ceil(bw*e.hp/e.maxhp),4);
+    if(e.rare&&!CALM){c.fillStyle='#fff6c9';for(let i=0;i<4;i++){const a=time*2+i*1.6;c.fillRect(e.px+Math.cos(a)*42|0,e.py+Math.sin(a*1.3)*34|0,2,2)}}
+  }
+  const p=pos('p'),x=p.x-24-(bt.plunge>0?14:0),y=p.y-24;
+  c.fillStyle='rgba(0,0,0,.3)';c.fillRect(x+8,y+43,32,5);
+  if(!(bt.pflash>0&&Math.floor(bt.pflash*30)%2===0))c.drawImage(charSprite(look(),'left',bt.active==='p'?(Math.floor(time*5)%2)+1:0),x,y,48,48);
+  if(bt.guard){c.fillStyle='rgba(160,220,255,.6)';c.fillRect(x-5,y+8,3,30);c.fillRect(x-2,y+6,3,3);c.fillRect(x-2,y+37,3,3)}
+  bt.fx=bt.fx.filter(f=>(f.life-=dt)>0);
+  for(const f of bt.fx){f.x+=f.vx*dt;f.y+=f.vy*dt;f.vy+=90*dt;c.fillStyle=f.col;c.fillRect(f.x|0,f.y|0,f.z,f.z)}
+  bt.floats=bt.floats.filter(f=>(f.t+=dt)<.85);
+  for(const f of bt.floats)drawNum(f.n,f.x,f.y-Math.min(f.t,.3)*40,f.col);
+  renderMist(G?Math.min(.2,.07+.015*mist()):.1);
+  c.restore();
+}
+function findPath(tx,ty,adjacent){
+  const k=(x,y)=>x+','+y,prev={[k(P.x,P.y)]:null},q=[[P.x,P.y]];
+  const goal=adjacent?(x,y)=>Math.abs(x-tx)+Math.abs(y-ty)===1:(x,y)=>x===tx&&y===ty;
+  while(q.length){
+    const[x,y]=q.shift();
+    if(goal(x,y)){const path=[];let cur=k(x,y);while(prev[cur]){path.unshift(prev[cur][1]);cur=prev[cur][0]}return path}
+    for(const d in DIRS){const[a,b]=DIRS[d],nx=x+a,ny=y+b,nk=k(nx,ny);if(nk in prev||blocked(nx,ny))continue;prev[nk]=[k(x,y),d];q.push([nx,ny])}
+  }
+  return null;
+}
+function faceTo(x,y){const dx=x-P.x,dy=y-P.y;P.dir=Math.abs(dx)>Math.abs(dy)?(dx>0?'right':'left'):(dy>0?'down':'up')}
+function clickMap(x,y){
+  if(mode!=='map'||!G)return;
+  const interactive=plotAt(x,y)||blocked(x,y)&&describe(x,y);
+  if(!interactive){const path=findPath(x,y,false);if(path){P.path=path;P.then=null}return}
+  const path=findPath(x,y,true);if(!path)return;
+  P.path=path;P.then=[x,y];
+}
+function update(dt){
+  if(plotShake&&(plotShake.t-=dt)<=0)plotShake=null;
+  if(mode!=='map'||!G)return;
+  if(!P.moving){
+    const d=held[held.length-1];
+    if(d)P.path=null;
+    if(P.path&&!P.path.length){const t=P.then;P.path=null;P.then=null;if(t){faceTo(t[0],t[1]);mapHint();act(t[0],t[1]);if(mode!=='map')return}}
+    const nd=d||(P.path&&P.path.shift());
+    if(nd){
+      if(P.dir!==nd){P.dir=nd;mapHint()}
+      const[dx,dy]=DIRS[nd],nx=P.x+dx,ny=P.y+dy;
+      if(!blocked(nx,ny)){P.moving=true;P.t=0;P.fx=P.x;P.fy=P.y;P.x=nx;P.y=ny}else P.path=null;
+    }
+  }
+  if(P.moving){
+    P.t+=dt/.14;
+    if(P.t>=1){P.moving=false;P.fx=P.x;P.fy=P.y;G.x=P.x;G.y=P.y;mapHint()}
+  }
+}
+let last=performance.now();
+function frame(now){
+  requestAnimationFrame(frame);
+  const dt=Math.min(.05,(now-last)/1000);last=now;time+=dt;
+  update(dt);
+  c.imageSmoothingEnabled=false;
+  shake=Math.max(0,shake-dt*10);
+  c.save();if(shake>0&&!CALM)c.translate(Math.round(rand(-shake,shake)),0);
+  if(bt)renderBattle(dt);else renderFarm();
+  c.restore();
+  if(fade>0){c.fillStyle=`rgba(0,0,0,${fade})`;c.fillRect(0,0,W,H)}
+}
+
+/* ---------- Input ---------- */
+const held=[];
+const KEY={ArrowUp:'up',ArrowDown:'down',ArrowLeft:'left',ArrowRight:'right',w:'up',s:'down',a:'left',d:'right',W:'up',S:'down',A:'left',D:'right'};
+function doFacing(){if(mode!=='map'||P.moving)return;const[x,y]=facing();act(x,y)}
+addEventListener('keydown',e=>{
+  if(e.target.matches&&e.target.matches('textarea,input')&&e.key!=='Escape')return;
+  const d=KEY[e.key],ok=e.key==='Enter'||e.key===' '||e.key==='z'||e.key==='Z',no=e.key==='Escape'||e.key==='x'||e.key==='X',num=['1','2','3'].indexOf(e.key);
+  if(num>=0&&mode==='map'&&G){G.sel=CROP_IDS[num];sfx.move();renderSeeds();mapHint();return}
+  if(!(d||ok||no))return;
+  if(e.target.closest&&e.target.closest('#foot,#seeds')&&ok)return;
+  e.preventDefault();
+  if(UI){
+    if(e.repeat&&ok)return;
+    if(d)UI.move(DIRS[d][0],DIRS[d][1]);else if(ok)UI.confirm();else UI.cancel();
+    return;
+  }
+  if(d){if(!held.includes(d))held.push(d)}
+  else if(!e.repeat){if(ok)doFacing();else fieldMenu()}
+});
+addEventListener('keyup',e=>{const d=KEY[e.key];if(d){const i=held.indexOf(d);if(i>=0)held.splice(i,1)}});
+addEventListener('blur',()=>{held.length=0});
+cv.addEventListener('pointerdown',e=>{
+  cv.focus({preventScroll:true});
+  const r=cv.getBoundingClientRect(),x=Math.floor((e.clientX-r.left)/r.width*20),y=Math.floor((e.clientY-r.top)/r.height*15);
+  clickMap(x,y);
+});
+document.querySelectorAll('#dpad button').forEach(b=>{
+  const d=b.dataset.d,off=()=>{const i=held.indexOf(d);if(i>=0)held.splice(i,1)};
+  b.addEventListener('pointerdown',e=>{e.preventDefault();held.length=0;held.push(d)});
+  ['pointerup','pointerleave','pointercancel'].forEach(t=>b.addEventListener(t,off));
+});
+$('#btnAct').addEventListener('click',doFacing);
+$('#btnMenu').addEventListener('click',fieldMenu);
+function paintMute(){$('#mute').textContent=muted?'เสียง: ปิด':'เสียง: เปิด'}
+$('#mute').addEventListener('click',()=>{muted=!muted;try{localStorage.setItem('mg-mute',muted?'1':'0')}catch(e){}paintMute();$('#mute').blur();sfx.ok()});
+paintMute();
+requestAnimationFrame(frame);
+titleScreen();
+</script>
