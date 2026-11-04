@@ -146,13 +146,13 @@ const sfx={
 
 /* ---------- Game data ---------- */
 const CROPS={
-  carrot:{name:'แครอท',seed:5,sell:12,days:2,eat:10,
+  carrot:{name:'แครอท',unit:'หัว',base:1,extra:[[3,.05],[2,.20]],seed:5,sell:12,days:2,eat:10,
     fact:'แครอทมีเบตาแคโรทีน ร่างกายเปลี่ยนเป็นวิตามิน A ซึ่งจำเป็นต่อการมองเห็น',
     power:'ตาไว',set2:'โอกาสคริติคอล +15%',set3:'ตีไม่พลาด และคริติคอลแรงขึ้น'},
-  tomato:{name:'มะเขือเทศ',seed:12,sell:30,days:3,eat:18,
+  tomato:{name:'มะเขือเทศ',unit:'ผล',base:3,extra:[[6,.05],[5,.20],[4,.35]],seed:12,sell:10,days:3,eat:6,
     fact:'มะเขือเทศมีวิตามิน C ซึ่งร่างกายใช้สร้างคอลลาเจนและสมานแผล',
     power:'แผลหายไว',set2:'ฟื้น HP 2 ทุกเทิร์น',set3:'ฟื้น HP 4 ทุกเทิร์น'},
-  pumpkin:{name:'ฟักทอง',seed:25,sell:70,days:4,eat:35,
+  pumpkin:{name:'ฟักทอง',unit:'ลูก',base:1,extra:[[3,.02],[2,.10]],seed:25,sell:70,days:4,eat:35,
     fact:'ฟักทองมีเบตาแคโรทีนและวิตามิน C ซึ่งมีส่วนช่วยระบบภูมิคุ้มกัน',
     power:'ภูมิคุ้มกันดี',set2:'ลดโอกาสติดสถานะ 50%',set3:'กันสถานะผิดปกติทั้งหมด'},
 };
@@ -203,7 +203,7 @@ const PX=6,PY=6;
 /* ---------- State ---------- */
 let G=null,mode='title',fade=0,time=0,shake=0;
 const P={x:4,y:5,fx:4,fy:5,dir:'down',moving:false,t:0,path:null,then:null};
-let fxMap=[];
+let fxMap=[],floatsMap=[];
 function newGame(){
   const plots=[];for(let i=0;i<36;i++)plots.push({c:null,g:0,w:false});
   return {day:1,gold:40,shards:0,lv:1,xp:0,hp:40,pw:10,seeds:{carrot:6,tomato:0,pumpkin:0},veg:{carrot:0,tomato:0,pumpkin:0},
@@ -446,6 +446,11 @@ function waterAt(p){
   }
   note(range?'รดน้ำรอบ ๆ เรียบร้อย':'รดน้ำเรียบร้อย');
 }
+function rollYield(kind){
+  let r=Math.random();
+  for(const[n,chance]of CROPS[kind].extra){if(r<chance)return n;r-=chance}
+  return CROPS[kind].base;
+}
 function harvest(p,x,y){
   const s=G.plots[p.i],kind=s.c;
   const safe=G.harvests<2;
@@ -457,9 +462,12 @@ function harvest(p,x,y){
     return script(()=>encounter(p,kind,rare,x,y));
   }
   G.pity++;
-  s.c=null;s.g=0;s.w=false;G.veg[kind]++;
-  sfx.harvest();burstMap(x,y,'#ffcf6b',8);
-  note(`เก็บ${CROPS[kind].name}ได้ 1 ลูก รวมในกระเป๋า ${G.veg[kind]}`);
+  const n=rollYield(kind),unit=CROPS[kind].unit,bumper=n>CROPS[kind].base;
+  s.c=null;s.g=0;s.w=false;G.veg[kind]+=n;
+  sfx.harvest();burstMap(x,y,'#ffcf6b',Math.min(24,8*n));
+  if(bumper)sfx.coin();
+  if(n>1)floatsMap.push({x:x*T+8,y:y*T-2,n:'+'+n,t:0});
+  note(`${bumper?'ผลดก! ':''}เก็บ${CROPS[kind].name}ได้ ${n} ${unit} รวมในกระเป๋า ${G.veg[kind]} ${unit}`);
   gainXP(1,true);renderStatus();mapHint();saveSoon();
 }
 async function encounter(p,kind,rare,x,y){
@@ -860,6 +868,8 @@ function renderFarm(){
   }
   fxMap=fxMap.filter(f=>(f.life-=1/60)>0);
   for(const f of fxMap){f.x+=f.vx/60;f.y+=f.vy/60;f.vy+=2;c.fillStyle=f.col;c.fillRect(f.x|0,f.y|0,2,2)}
+  floatsMap=floatsMap.filter(f=>(f.t+=1/60)<1);
+  for(const f of floatsMap)drawNum(f.n,f.x,f.y-Math.min(f.t,.4)*24,'#ffcf6b');
   renderMist(G?Math.min(.34,.13+.025*mist()):.3);
 }
 function renderBattle(dt){
