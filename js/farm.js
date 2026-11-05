@@ -105,19 +105,20 @@ function readyPlots(p){
   }
   return list.sort((u,v)=>u.dist-v.dist);
 }
-const harvestCost=n=>Math.ceil(n/(perkTier('atk')+1))*STAMINA_COST.harvest;
+// One harvest action costs 1 SP. STR decides how many plots that action can reach.
+const harvestCapacity=()=>1+perkTier('atk');
 async function harvestMenu(p,x,y){
-  const ready=readyPlots(p);
+  const ready=readyPlots(p),max=Math.min(harvestCapacity(),ready.length);
   let count=1;
-  if(ready.length>1){
-    const counts=[...new Set([...HARVEST_CHOICES.filter(n=>n<ready.length),ready.length])];
-    setMsg(`มีผักพร้อมเก็บ ${ready.length} แปลง จะเก็บกี่แปลง? ยิ่งเยอะยิ่งเสี่ยงเจอมอนสเตอร์พร้อมกันหลายตัว`,`SP ${G.stam}/${maxStam()}`);
-    const start=Math.max(0,counts.lastIndexOf(counts.filter(n=>n<=(G.lastHarvest||1)).pop()));
-    count=await choose(counts.map(n=>({label:n===ready.length?`ทั้งหมด ${n} แปลง`:`${n} แปลง`,sub:`SP ${harvestCost(n)}`,value:n,disabled:G.stam<harvestCost(n)})),{cancel:true,start});
+  if(max>1){
+    if(G.stam<STAMINA_COST.harvest){useStamina(STAMINA_COST.harvest);return}
+    setMsg(`STR เก็บได้สูงสุด ${harvestCapacity()} แปลงต่อครั้ง จะเก็บกี่แปลง? ยิ่งเยอะยิ่งเสี่ยงเจอมอนสเตอร์พร้อมกันหลายตัว`,`SP ${G.stam}/${maxStam()}`);
+    const counts=Array.from({length:max},(_,i)=>i+1);
+    count=await choose(counts.map(n=>({label:`${n} แปลง`,sub:`SP ${STAMINA_COST.harvest}`,value:n})),{cancel:true,start:Math.min(max,G.lastHarvest||1)-1});
     if(!count)return;
     G.lastHarvest=count;
   }
-  if(!useStamina(harvestCost(count)))return;
+  if(!useStamina(STAMINA_COST.harvest))return;
   await harvestBatch(ready.slice(0,count));
 }
 function rollMutation(){
