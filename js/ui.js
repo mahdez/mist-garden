@@ -10,11 +10,12 @@ function statusTags(){
 function foeStatus(){
   if(!bt)return '';
   const e=bt.e,tags=[];
-  const risk=riskOf(e);
+  const others=bt.foes.filter(f=>f!==e&&f.hp>0);
+  const risk=riskOf(bt.foes.filter(f=>f.hp>0).concat(bt.queue));
   tags.push(`<span class="${risk.cls}">ความเสี่ยง: ${risk.name}</span>`);
   if(e.rare)tags.push('<span class="set">ร่างทองคำ</span>');
   if(e.trans)tags.push('<span class="bad">ก้าวข้ามจุดอ่อน</span>');
-  if(e.known||(!e.trans&&G.seen[e.kind].known))tags.push(`<span class="set">แพ้${TOOLS[e.weak].el}</span>`);
+  if(e.known||(!e.trans&&G.seen[e.kind]&&G.seen[e.kind].known))tags.push(`<span class="set">แพ้${TOOLS[e.weak].el}</span>`);
   if(e.charging)tags.push('<span class="bad">กำลังเตรียมโจมตีหนัก</span>');
   if(e.status.poison>0)tags.push(`<span class="bad">ติดพิษ ${e.status.poison} เทิร์น</span>`);
   if(e.status.blind>0)tags.push(`<span class="bad">ตาพร่า ${e.status.blind} เทิร์น</span>`);
@@ -22,7 +23,9 @@ function foeStatus(){
   return `<div class="foe"><div class="row"><b>${e.name}</b><small>HP ${e.hp}/${e.maxhp}</small></div>
     <div class="bar hp ${e.hp/e.maxhp<.3?'low':''}"><i style="width:${e.hp/e.maxhp*100}%"></i></div>
     <div class="stats"><span>พลังรวม ${foeCP(e)}</span><span>โจมตี ${Math.round(e.atk)}</span><span>ป้องกัน ${Math.round(e.def)}</span><span>ความเร็ว ${e.spd}</span></div>
-    <div class="tags">${tags.join('')}</div></div>`;
+    <div class="tags">${tags.join('')}</div>
+    ${others.map(f=>`<div class="row other"><small>${f.name}${f.charging?' · เตรียมโจมตีหนัก':''}</small><small>HP ${f.hp}/${f.maxhp}</small></div>`).join('')}
+    ${bt.queue.length?`<div class="row other"><small>รออยู่อีก ${bt.queue.length} ตัว</small></div>`:''}</div>`;
 }
 function renderStatus(){
   if(!G){$('#status').innerHTML='';$('#info').textContent='';$('#seeds').innerHTML='';return}
@@ -49,10 +52,11 @@ let UI=null;
 function choose(items,o={}){
   return new Promise(res=>{
     const list=o.cancel?[...items,{label:'◂ กลับ',value:null}]:items;
-    let sel=Math.max(0,list.findIndex(i=>!i.disabled));
+    const first=Math.max(0,list.findIndex(i=>!i.disabled));
+    let sel=o.start!==undefined&&list[o.start]&&!list[o.start].disabled?o.start:first;
     const box=$('#menu');box.innerHTML='';box.style.gridTemplateColumns=o.cols?`repeat(${o.cols},minmax(0,1fr))`:'';
-    const paint=(s=true)=>{[...box.children].forEach((b,i)=>b.classList.toggle('sel',i===sel));if(s)box.children[sel]?.scrollIntoView({block:'nearest'})};
-    const done=v=>{UI=null;box.innerHTML='';res(v)};
+    const paint=(s=true)=>{[...box.children].forEach((b,i)=>b.classList.toggle('sel',i===sel));if(s)box.children[sel]?.scrollIntoView({block:'nearest'});if(o.onHover)o.onHover(list[sel])};
+    const done=v=>{UI=null;box.innerHTML='';if(o.onHover)o.onHover(null);res(v)};
     const confirm=()=>{const it=list[sel];if(!it||it.disabled){sfx.back();return}sfx.ok();if(it.run)it.run();done(it.value)};
     list.forEach((it,i)=>{const b=document.createElement('button');b.type='button';
       b.innerHTML='<span></span>'+(it.sub?'<small></small>':'');b.firstChild.textContent=it.label;if(it.sub)b.lastChild.textContent=it.sub;

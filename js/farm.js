@@ -1,9 +1,15 @@
 'use strict';
 const DIRS={up:[0,-1],down:[0,1],left:[-1,0],right:[1,0]};
-const tileAt=(x,y)=>MAP[y]&&MAP[y][x]||null;
-function blocked(x,y){const t=tileAt(x,y);return !t||SOLID.includes(t)}
+const inCrater=()=>G&&G.area==='crater';
+const tileAt=(x,y)=>{const m=inCrater()?CRATER_MAP:MAP;return m[y]&&m[y][x]||null};
+function blocked(x,y){
+  const t=tileAt(x,y);
+  if(inCrater())return !t||CRATER_SOLID.includes(t)||!!craterThing(x,y);
+  return !t||SOLID.includes(t);
+}
 const facing=()=>{const[d,e]=DIRS[P.dir];return[P.x+d,P.y+e]};
 function describe(x,y){
+  if(inCrater())return craterDescribe(x,y);
   const t=tileAt(x,y),p=plotAt(x,y);
   if(p){
     if(!p.unlocked)return 'ที่ดินยังไม่ได้ซื้อ ซื้อเพิ่มได้ที่ร้าน';
@@ -16,9 +22,9 @@ function describe(x,y){
   if(t==='D')return 'Enter: เข้านอน ไปวันถัดไป';
   if(t==='a'||t==='c')return 'Enter: ซื้อของที่ร้าน';
   if(t==='b')return 'Enter: ขายผัก';
-  if(t==='M')return 'Enter: ดูอุกกาบาต';
+  if(t==='M')return 'Enter: ลงไปในหลุมอุกกาบาต';
   if(t==='o')return 'Enter: ดูบ่อน้ำ';
-  if(t==='~')return 'Enter: ดูบ่อปลา';
+  if(t==='~')return 'Enter: ดูแลบ่อปลา';
   return null;
 }
 function mapHint(){
@@ -31,6 +37,7 @@ function note(t){$('#msg').textContent=t}
 function burstMap(x,y,col,n=8){for(let i=0;i<(CALM?3:n);i++){const a=rand(0,TAU),s=rand(10,40);fxMap.push({x:x*T+8,y:y*T+8,vx:Math.cos(a)*s,vy:Math.sin(a)*s-16,life:rand(.25,.5),col})}}
 function act(x,y){
   if(mode!=='map')return;
+  if(inCrater())return craterAct(x,y);
   const t=tileAt(x,y),p=plotAt(x,y);
   if(p){
     if(!p.unlocked){note('ที่ดินแปลงนี้ยังไม่ใช่ของเรา ซื้อเพิ่มได้ที่ร้าน');sfx.back();return}
@@ -40,7 +47,8 @@ function act(x,y){
       if(!useStamina(STAMINA_COST.plant))return;
       G.seeds[G.sel]--;s.c=G.sel;s.g=0;s.w=false;sfx.plant();burstMap(x,y,'#a4d96c',5);note(`ปลูก${CROPS[s.c].name}แล้ว อย่าลืมรดน้ำ`);extraWork('plant',x,y);renderSeeds();mapHint();saveSoon();return;
     }
-    if(s.g>=CROPS[s.c].days){if(!useStamina(STAMINA_COST.harvest))return;harvest(p,x,y);extraWork('harvest',x,y);return}
+    if(s.mutant)return harvest(p,x,y);
+    if(s.g>=CROPS[s.c].days)return script(()=>harvestMenu(p,x,y));
     if(s.w){note(`${CROPS[s.c].name}รดน้ำแล้ว รอพรุ่งนี้`);return}
     if(!useStamina(STAMINA_COST.water))return;
     waterAt(p);sfx.water();extraWork('water',x,y);mapHint();saveSoon();return;
@@ -48,9 +56,9 @@ function act(x,y){
   if(t==='D')return script(sleep);
   if(t==='a'||t==='c')return script(shop);
   if(t==='b')return script(sell);
-  if(t==='M')return script(()=>say('อุกกาบาตลูกนี้ตกลงมาพร้อมกับลูกอื่นทั่วโลก หมอกสีม่วงยังซึมออกมาไม่หยุด'));
+  if(t==='M')return script(enterCrater);
   if(t==='o')return script(()=>say('น้ำในบ่อยังใสดี ที่นี่ปลอดภัยจากหมอกอยู่ แค่ยังไม่รู้ว่าจะอีกนานแค่ไหน'));
-  if(t==='~')return script(()=>say('บ่อปลาว่างเปล่า ไว้วันหลังค่อยปล่อยปลาลงไป'));
+  if(t==='~')return script(pondMenu);
 }
 // STR perk: the same job carries on to the next plots in the direction the farmer faces, for no extra SP.
 function extraWork(kind,x,y){
@@ -88,54 +96,86 @@ function rollYield(kind){
   for(const[n,chance]of CROPS[kind].extra){if(r<chance)return n+bonus;r-=chance}
   return CROPS[kind].base+bonus;
 }
-function harvest(p,x,y){
-  const s=G.plots[p.i],kind=s.c;
-  if(s.mutant)return script(()=>encounter(p,kind,s.mutant==='rare',x,y,!!s.trans));
+// Plots ready to harvest, nearest to the chosen one first. Waiting monsters are fought separately.
+function readyPlots(p){
+  const list=[];
+  for(let b=0;b<landSize();b++)for(let a=0;a<landSize();a++){
+    const s=G.plots[b*6+a];
+    if(s.c&&!s.mutant&&s.g>=CROPS[s.c].days)list.push({p:plotAt(PX+a,PY+b),x:PX+a,y:PY+b,dist:Math.abs(a-p.a)+Math.abs(b-p.b)});
+  }
+  return list.sort((u,v)=>u.dist-v.dist);
+}
+const harvestCost=n=>Math.ceil(n/(perkTier('atk')+1))*STAMINA_COST.harvest;
+async function harvestMenu(p,x,y){
+  const ready=readyPlots(p);
+  let count=1;
+  if(ready.length>1){
+    const counts=[...new Set([...HARVEST_CHOICES.filter(n=>n<ready.length),ready.length])];
+    setMsg(`มีผักพร้อมเก็บ ${ready.length} แปลง จะเก็บกี่แปลง? ยิ่งเยอะยิ่งเสี่ยงเจอมอนสเตอร์พร้อมกันหลายตัว`,`SP ${G.stam}/${maxStam()}`);
+    const start=Math.max(0,counts.lastIndexOf(counts.filter(n=>n<=(G.lastHarvest||1)).pop()));
+    count=await choose(counts.map(n=>({label:n===ready.length?`ทั้งหมด ${n} แปลง`:`${n} แปลง`,sub:`SP ${harvestCost(n)}`,value:n,disabled:G.stam<harvestCost(n)})),{cancel:true,start});
+    if(!count)return;
+    G.lastHarvest=count;
+  }
+  if(!useStamina(harvestCost(count)))return;
+  await harvestBatch(ready.slice(0,count));
+}
+function rollMutation(){
   const safe=G.harvests<2;
   const chance=safe?0:Math.min(.45,.10+.015*(mist()-1)+G.pity*.015);
   G.harvests++;
-  if(Math.random()<chance){
-    G.pity=0;
-    const rare=Math.random()<.1;
-    return script(()=>encounter(p,kind,rare,x,y));
-  }
-  G.pity++;
-  const n=rollYield(kind),unit=CROPS[kind].unit,bumper=n>CROPS[kind].base;
-  s.c=null;s.g=0;s.w=false;G.veg[kind]+=n;
-  sfx.harvest();burstMap(x,y,'#ffcf6b',Math.min(24,8*n));
-  if(bumper)sfx.coin();
-  if(n>1)floatsMap.push({x:x*T+8,y:y*T-2,n:'+'+n,t:0});
-  note(`${bumper?'ผลดก! ':''}เก็บ${CROPS[kind].name}ได้ ${n} ${unit} รวมในกระเป๋า ${G.veg[kind]} ${unit}`);
-  gainXP(1,true);renderStatus();mapHint();saveSoon();
+  if(Math.random()<chance){G.pity=0;return true}
+  G.pity++;return false;
 }
-async function encounter(p,kind,rare,x,y,trans){
-  if(trans===undefined)trans=Math.random()<transcendChance();
+async function harvestBatch(list){
+  const monsters=[],gained={};
+  for(const t of list){
+    const s=G.plots[t.p.i],kind=s.c;
+    if(rollMutation()){monsters.push({p:t.p,kind,rare:Math.random()<.1,x:t.x,y:t.y});continue}
+    const n=rollYield(kind);
+    s.c=null;s.g=0;s.w=false;G.veg[kind]+=n;gained[kind]=(gained[kind]||0)+n;
+    burstMap(t.x,t.y,'#ffcf6b',Math.min(24,8*n));
+    if(n>1)floatsMap.push({x:t.x*T+8,y:t.y*T-2,n:'+'+n,t:0});
+  }
+  const kinds=Object.keys(gained);
+  if(kinds.length){
+    sfx.harvest();
+    note(`เก็บได้ ${kinds.map(k=>`${CROPS[k].name} ${gained[k]} ${CROPS[k].unit}`).join(', ')}`);
+    gainXP(list.length-monsters.length,true);renderStatus();mapHint();saveSoon();
+  }
+  if(monsters.length)await encounterGroup(monsters);
+}
+function harvest(p,x,y){
+  const s=G.plots[p.i];
+  if(s.mutant)return script(()=>encounterGroup([{p,kind:s.c,rare:s.mutant==='rare',x,y,trans:!!s.trans}]));
+  return script(()=>harvestBatch([{p,x,y}]));
+}
+async function encounterGroup(list){
+  for(const m of list)if(m.trans===undefined)m.trans=Math.random()<transcendChance();
   inFight=true;
   showPad(false);
   sfx.enc();shake=4;
-  setMsg(`${CROPS[kind].name}ต้นนี้ดิ้นอยู่ในดิน!`);
-  plotShake={i:p.i,t:.8};
+  setMsg(list.length>1?`ผัก ${list.length} ต้นดิ้นอยู่ในดิน!`:`${CROPS[list[0].kind].name}ต้นนี้ดิ้นอยู่ในดิน!`);
+  plotShake={i:list[0].p.i,t:.8};
   await wait(800);
-  G.plots[p.i]={c:null,g:0,w:false};
-  const res=await battle(kind,rare,trans);
+  for(const m of list)G.plots[m.p.i]={c:null,g:0,w:false};
+  const res=await battle(list.map(m=>({kind:m.kind,rare:m.rare,trans:m.trans})));
   inFight=false;
   if(res==='retreat'){
-    // The revealed monster stays in this plot, unchanged, until the player comes back.
-    G.plots[p.i]={c:kind,g:CROPS[kind].days,w:false,mutant:rare?'rare':'normal',trans};
-    note(`ถอยออกมาได้ มอนสเตอร์ยังรออยู่ในแปลง ${p.a+1},${p.b+1}`);saveSoon();return;
+    // Revealed monsters stay in their plots, unchanged, until the player comes back.
+    for(const m of list)G.plots[m.p.i]={c:m.kind,g:CROPS[m.kind].days,w:false,mutant:m.rare?'rare':'normal',trans:m.trans};
+    note(list.length>1?`ถอยออกมาได้ มอนสเตอร์ ${list.length} ตัวยังรออยู่ในแปลง`:'ถอยออกมาได้ มอนสเตอร์ยังรออยู่ในแปลง');saveSoon();return;
   }
   if(res==='win'||res==='boom'){saveSoon();return}
-  const near=[];
-  for(let b=p.b-1;b<=p.b+1;b++)for(let a=p.a-1;a<=p.a+1;a++){
-    if(a<0||b<0||a>=6||b>=6||(a===p.a&&b===p.b))continue;
-    if(G.plots[b*6+a].c)near.push(b*6+a);
+  const near=new Set(),own=new Set(list.map(m=>m.p.i));
+  for(const m of list)for(let b=m.p.b-1;b<=m.p.b+1;b++)for(let a=m.p.a-1;a<=m.p.a+1;a++){
+    if(a<0||b<0||a>=6||b>=6||own.has(b*6+a))continue;
+    if(G.plots[b*6+a].c)near.add(b*6+a);
   }
-  near.sort(()=>Math.random()-.5);
-  const gone=near.slice(0,[3,1,0][perkTier('def')]);gone.forEach(i=>{G.plots[i]={c:null,g:0,w:false}});
-  if(res==='lose'){
-    await say(gone.length?`มอนสเตอร์ทำลายผักข้าง ๆ ไป ${gone.length} ต้น แล้วหายเข้าไปในหมอก เราสลบไปจนเช้า`:'มอนสเตอร์หายเข้าไปในหมอก เราสลบไปจนเช้า');
-    await nextDay(perkTier('hp')>=1?1:.5);
-  }
+  const gone=[...near].sort(()=>Math.random()-.5).slice(0,[3,1,0][perkTier('def')]*list.length);
+  gone.forEach(i=>{G.plots[i]={c:null,g:0,w:false}});
+  await say(gone.length?`มอนสเตอร์ทำลายผักข้าง ๆ ไป ${gone.length} ต้น แล้วหายเข้าไปในหมอก เราสลบไปจนเช้า`:'มอนสเตอร์หายเข้าไปในหมอก เราสลบไปจนเช้า');
+  await nextDay(perkTier('hp')>=1?1:.5);
   saveSoon();
 }
 let plotShake=null;
@@ -148,6 +188,7 @@ async function nextDay(hpRatio=1){
     if(s.c&&s.w&&s.g<CROPS[s.c].days){s.g++;if(s.g<CROPS[s.c].days&&Math.random()<growChance)s.g++}
     s.w=false;
   }
+  growPond();
   G.hp=Math.max(1,Math.round(maxHP()*hpRatio));G.pw=maxPW();G.stam=Math.round(maxStam()*hpRatio);
   save();pushBackup({...G,x:P.x,y:P.y});renderStatus();
   await fadeTo(0,300);
@@ -170,8 +211,11 @@ async function shop(){
     if(!G.can)list.push({label:'บัวรดน้ำใบใหญ่',sub:'รดน้ำ 3×3 · 250 G · เศษ 2',value:{up:'can',g:250,s:2},disabled:G.gold<250||G.shards<2});
     if(G.land<2){const g=G.land?500:200;list.push({label:`ซื้อที่ดินเป็น ${5+G.land}×${5+G.land}`,sub:`${g} G`,value:{up:'land',g,s:0},disabled:G.gold<g})}
     for(const[id,t]of Object.entries(TOOLS))if(!G.tools[id])list.push({label:t.name,sub:`เครื่องมือต่อสู้ธาตุ${t.el} · ${t.price} G`,value:{tool:id,g:t.price},disabled:G.gold<t.price});
+    if(spentPoints()>0)list.push({label:'ล้างแต้มสถานะ',sub:`เศษอุกกาบาต ${SHARD_COST.respec}`,value:{service:respecMenu},disabled:G.shards<SHARD_COST.respec});
+    list.push({label:'หลอมอุปกรณ์',sub:`เพิ่ม 1 ขั้น · เศษอุกกาบาต ${SHARD_COST.reforge}`,value:{service:reforgeMenu},disabled:G.shards<SHARD_COST.reforge});
     const v=await choose(list,{cancel:true});
     if(!v)return;
+    if(v.service){await v.service();continue}
     if(v.tool){G.gold-=v.g;G.tools[v.tool]=1}
     else if(v.seed){G.gold-=CROPS[v.seed].seed*v.n;G.seeds[v.seed]+=v.n}
     else{G.gold-=v.g;G.shards-=v.s;G[v.up]++}
@@ -180,12 +224,12 @@ async function shop(){
 }
 async function sell(){
   for(;;){
-    const total=CROP_IDS.reduce((a,k)=>a+G.veg[k]*CROPS[k].sell,0);
-    setMsg(total?`ผักในกระเป๋าขายได้รวม ${total} G`:'ยังไม่มีผักให้ขาย ไปเก็บเกี่ยวก่อน');
-    const list=[{label:'ขายทั้งหมด',sub:`${total} G`,value:'all',disabled:!total},...CROP_IDS.filter(k=>G.veg[k]>0).map(k=>({label:`${CROPS[k].name} × ${G.veg[k]}`,sub:`ลูกละ ${CROPS[k].sell} G`,value:k,disabled:!G.veg[k]}))];
+    const total=CROP_IDS.reduce((a,k)=>a+G.veg[k]*CROPS[k].sell,0)+Object.keys(FISH).reduce((a,k)=>a+G.fish[k]*FISH[k].sell,0)+G.goldFish*GOLD_FISH_SELL;
+    setMsg(total?`ผักและปลาในกระเป๋าขายได้รวม ${total} G`:'ยังไม่มีของให้ขาย ไปเก็บเกี่ยวหรือจับปลาก่อน');
+    const list=[{label:'ขายทั้งหมด',sub:`${total} G`,value:'all',disabled:!total},...CROP_IDS.filter(k=>G.veg[k]>0).map(k=>({label:`${CROPS[k].name} × ${G.veg[k]}`,sub:`ลูกละ ${CROPS[k].sell} G`,value:k,disabled:!G.veg[k]})),...Object.keys(FISH).filter(k=>G.fish[k]>0).map(k=>({label:`${FISH[k].name} × ${G.fish[k]}`,sub:`ตัวละ ${FISH[k].sell} G`,value:k})),...(G.goldFish>0?[{label:`ปลาทอง × ${G.goldFish}`,sub:`ตัวละ ${GOLD_FISH_SELL} G`,value:'goldFish'}]:[])];
     const v=await choose(list,{cancel:true});
     if(!v)return;
-    if(v==='all'){G.gold+=total;CROP_IDS.forEach(k=>G.veg[k]=0)}else{G.gold+=CROPS[v].sell;G.veg[v]--}
+    if(v==='all'){G.gold+=total;CROP_IDS.forEach(k=>G.veg[k]=0);for(const k in FISH)G.fish[k]=0;G.goldFish=0}else if(v==='goldFish'){G.gold+=GOLD_FISH_SELL;G.goldFish--}else if(FISH[v]){G.gold+=FISH[v].sell;G.fish[v]--}else{G.gold+=CROPS[v].sell;G.veg[v]--}
     sfx.coin();renderStatus();saveSoon();
   }
 }
@@ -235,16 +279,19 @@ async function importPanel(){
     sfx.back();setMsg('รหัสนี้ใช้ไม่ได้ ตรวจว่าคัดลอกมาครบและขึ้นต้นด้วย MG1-');
   }
 }
-function eatList(){return [...(G.golden>0?[{label:`${GOLDEN_VEG.name} × ${G.golden}`,sub:'ฟื้น HP MP SP เต็ม',value:'golden'}]:[]),...CROP_IDS.filter(k=>G.veg[k]>0).map(k=>({label:`${CROPS[k].name} × ${G.veg[k]}`,sub:`HP +${eatHeal(k)}`,value:k}))]}
+function eatList(){return [...(G.goldFish>0?[{label:`ปลาทอง × ${G.goldFish}`,sub:'ฟื้น HP และ MP เต็ม',value:'goldFish'}]:[]),...Object.keys(FISH).filter(k=>G.fish[k]>0).map(k=>({label:`${FISH[k].name} × ${G.fish[k]}`,sub:`HP +${FISH[k].hp} · MP +${FISH[k].mp}`,value:k})),...(G.golden>0?[{label:`${GOLDEN_VEG.name} × ${G.golden}`,sub:'ฟื้น HP MP SP เต็ม',value:'golden'}]:[]),...CROP_IDS.filter(k=>G.veg[k]>0).map(k=>({label:`${CROPS[k].name} × ${G.veg[k]}`,sub:`HP +${eatHeal(k)}`,value:k}))]}
+const foodName=k=>k==='golden'?GOLDEN_VEG.name:k==='goldFish'?'ปลาทอง':FISH[k]?FISH[k].name:CROPS[k].name;
 function eatVeg(k){
+  if(k==='goldFish'){G.goldFish--;const v=maxHP()-G.hp;G.hp=maxHP();G.pw=maxPW();return v}
+  if(FISH[k]){G.fish[k]--;const f=FISH[k],v=Math.min(f.hp,maxHP()-G.hp);G.hp+=v;G.pw=Math.min(maxPW(),G.pw+f.mp);return v}
   if(k==='golden'){G.golden--;const v=maxHP()-G.hp;G.hp=maxHP();G.pw=maxPW();G.stam=Math.max(G.stam,maxStam());return v}
   G.veg[k]--;const v=Math.min(eatHeal(k),maxHP()-G.hp);G.hp+=v;return v}
 async function eatMenu(){
   for(;;){
     const l=eatList();if(!l.length){setMsg('ไม่มีผักในกระเป๋า');await wait(800);return}
     setMsg(`กินอะไรดี? HP ${G.hp}/${maxHP()} · MP ${G.pw}/${maxPW()} · SP ${G.stam}/${maxStam()}`);
-    const v=await choose(l.map(i=>i.value==='golden'?i:{...i,sub:`${i.sub} · SP +${FOOD_STAMINA[i.value]}`}),{cancel:true});if(!v)return;
-    eatVeg(v);if(v!=='golden')G.stam=Math.min(maxStam(),G.stam+FOOD_STAMINA[v]);sfx.heal();renderStatus();saveSoon();
+    const v=await choose(l.map(i=>FOOD_STAMINA[i.value]?{...i,sub:`${i.sub} · SP +${FOOD_STAMINA[i.value]}`}:i),{cancel:true});if(!v)return;
+    eatVeg(v);if(FOOD_STAMINA[v])G.stam=Math.min(maxStam(),G.stam+FOOD_STAMINA[v]);sfx.heal();renderStatus();saveSoon();
   }
 }
 function perkNext(k){

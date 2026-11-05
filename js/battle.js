@@ -17,6 +17,15 @@ const pos=who=>who==='e'?{x:bt.e.px,y:bt.e.py}:{x:FARM_POS.x-(bt.active==='p'?12
 function burst(x,y,col,n=14){if(CALM)n=5;for(let i=0;i<n;i++){const a=rand(0,TAU),s=rand(20,70);bt.fx.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s-20,life:rand(.3,.6),col,z:(rand(1,3)|0)||1})}}
 function pop(who,n,col='#ffffff'){const p=pos(who);bt.floats.push({x:p.x,y:p.y-28,t:0,n,col})}
 const log=async(t,ms=720)=>{setMsg(t);await wait(ms)};
+const aliveFoes=()=>bt.foes.filter(e=>e.hp>0);
+async function pickTarget(){
+  const list=aliveFoes();
+  if(list.length===1){bt.e=list[0];return true}
+  setMsg('เลือกเป้าหมาย');
+  const t=await choose(list.map(e=>({label:e.name,sub:`HP ${e.hp}/${e.maxhp}`,value:e})),{cancel:true,start:Math.max(0,list.indexOf(bt.e)),onHover:i=>{bt.cursor=i&&i.value||null}});
+  if(!t)return false;
+  bt.e=t;return true;
+}
 function hurtEnemy(d,col){
   d=Math.max(1,Math.round(d));const e=bt.e;e.hp=Math.max(0,e.hp-d);bt.eflash=.22;bt.shake=2;pop('e',d);burst(e.px,e.py,col||'#fff',10);renderStatus();return d;
 }
@@ -50,7 +59,9 @@ function playerAttack(mult,sureCrit){
   return{d,crit};
 }
 async function playerTurn(){
-  const s=bt.status;bt.guard=false;bt.reflect=false;bt.active='p';renderStatus();
+  const s=bt.status;bt.guard=false;bt.reflect=false;bt.active='p';
+  if(!bt.e||bt.e.hp<=0)bt.e=aliveFoes()[0];
+  renderStatus();
   const tomato=setCount('tomato');
   if(tomato>=2&&G.hp<maxHP()){const v=Math.min(tomato>=3?4:2,maxHP()-G.hp);G.hp+=v;pop('p','+'+v,'#7fd483');renderStatus();await wait(300)}
   const cure=[0,.5,1][setTier('ginger')];
@@ -60,9 +71,10 @@ async function playerTurn(){
   if(s.stun){s.stun=false;renderStatus();await log('ยังมึนงงอยู่ ขยับไม่ได้',760);return}
   renderStatus();
   for(;;){
-    setMsg('จะทำอะไรดี?',`เทิร์นที่ ${bt.round} · ${bt.first==='p'?'เราออกก่อน':`${bt.e.name}ออกก่อน`}`);
+    setMsg('จะทำอะไรดี?',`เทิร์นที่ ${bt.round} · ${bt.first==='p'?'เราออกก่อน':'มอนสเตอร์ออกก่อน'}`);
     const cmd=await choose([{label:'โจมตี',value:'atk'},{label:'สกิล',value:'skill'},{label:'เครื่องมือ',value:'tool'},{label:'กินผัก',value:'eat',disabled:!eatList().length},{label:'ป้องกัน',value:'guard'}],{cols:2});
     if(cmd==='atk'){
+      if(!await pickTarget())continue;
       bt.plunge=.25;const r=playerAttack(1);
       if(r.miss){sfx.miss();await log('ตีพลาด!',620);break}
       r.crit?sfx.crit():sfx.hit();setMsg(r.crit?'คริติคอล! โดนจุดสำคัญเต็ม ๆ':`โจมตี${bt.e.name}`);hurtEnemy(r.d);await wait(620);
@@ -78,10 +90,11 @@ async function playerTurn(){
       setMsg(`ใช้เครื่องมืออะไร? SP ${G.stam}/${maxStam()} · ระดับเกษตร ${farmLevel()}`);
       const k=await choose(Object.keys(G.tools).map(id=>({label:TOOLS[id].name,sub:`ธาตุ${TOOLS[id].el} · SP ${TOOLS[id].cost}`,value:id,disabled:G.stam<TOOLS[id].cost})),{cancel:true});
       if(!k)continue;
+      if(!await pickTarget())continue;
       const t=TOOLS[k],e=bt.e,isWeak=e.weak===k,oldWeak=e.trans&&WEAKNESS[e.kind].normal===k;
       G.stam-=t.cost;bt.plunge=.25;isWeak?sfx.crit():sfx.hit();
       hurtEnemy(toolPower()*(isWeak?TOOL_WEAK:oldWeak?TOOL_OLD_WEAK:1),t.col);burst(e.px,e.py,t.col,18);
-      if(isWeak){e.known=true;if(!e.trans)G.seen[e.kind].known=1}
+      if(isWeak){e.known=true;if(!e.trans&&G.seen[e.kind])G.seen[e.kind].known=1}
       renderStatus();
       await log(isWeak?`${t.act}${e.name}! โดนจุดอ่อน${t.el} แรงขึ้นมาก`:oldWeak?`${e.name}ไม่กลัว${t.el}อีกแล้ว แทบไม่สะดุ้ง`:`${t.act}${e.name}`,760);
       break;
@@ -90,6 +103,8 @@ async function playerTurn(){
       setMsg(`ใช้สกิลอะไร? SP ${G.stam}/${maxStam()} · MP ${G.pw}/${maxPW()}`);
       const sk=await choose([{label:'ฟันเต็มแรง',sub:'โจมตี 1.8 เท่า · SP 3',value:'slash',disabled:G.stam<3},{label:'ตั้งหลัก',sub:'ฟื้น HP 25% · MP 4',value:'rest',disabled:G.pw<4},...(G.equip.weapon?[(()=>{const w=WEAPON_SKILLS[itemCrop(G.equip.weapon)];return {label:w.name,sub:`${w.note} · SP ${w.cost}`,value:'weapon',disabled:G.stam<w.cost}})()]:[]),...(G.power?[{label:FRUITS[G.power].skill,sub:`${FRUITS[G.power].note} · ${RES_LABEL[FRUITS[G.power].res]} ${FRUITS[G.power].cost}`,value:'power',disabled:G[FRUITS[G.power].res]<FRUITS[G.power].cost}]:[])],{cancel:true});
       if(!sk)continue;
+      const selfSkill=sk==='rest'||(sk==='power'&&['reflect','cure'].includes(FRUITS[G.power].type));
+      if(!selfSkill&&!await pickTarget())continue;
       if(sk==='weapon'){
         const w=WEAPON_SKILLS[itemCrop(G.equip.weapon)];
         G.stam-=w.cost;renderStatus();bt.plunge=.25;const r=playerAttack(w.mult);
@@ -134,14 +149,14 @@ async function playerTurn(){
     if(cmd==='eat'){
       setMsg(`กินอะไรดี? HP ${G.hp}/${maxHP()}`);
       const k=await choose(eatList(),{cancel:true});if(!k)continue;
-      const v=eatVeg(k);sfx.heal();pop('p','+'+v,'#7fd483');const p=pos('p');burst(p.x,p.y,'#7fd483',12);renderStatus();await log(k==='golden'?`กิน${GOLDEN_VEG.name} ฟื้น HP MP SP เต็ม!`:`กิน${CROPS[k].name} ฟื้น HP ${v}`,620);break;
+      const v=eatVeg(k);sfx.heal();pop('p','+'+v,'#7fd483');const p=pos('p');burst(p.x,p.y,'#7fd483',12);renderStatus();await log(k==='golden'?`กิน${GOLDEN_VEG.name} ฟื้น HP MP SP เต็ม!`:FISH[k]||k==='goldFish'?`กิน${foodName(k)} ฟื้น HP และ MP`:`กิน${CROPS[k].name} ฟื้น HP ${v}`,620);break;
     }
     if(cmd==='guard'){bt.guard=true;G.pw=Math.min(maxPW(),G.pw+1);renderStatus();await log('ตั้งท่าป้องกัน รับความเสียหายครึ่งเดียว และได้ MP คืน 1',620);break}
   }
   bt.active=null;renderStatus();
 }
-async function enemyTurn(){
-  const e=bt.e;bt.active='e';e.turns++;
+async function enemyTurn(e){
+  bt.e=e;bt.active='e';e.turns++;renderStatus();
   if(e.status.poison>0){
     e.status.poison--;hurtEnemy(e.maxhp*FOE_POISON_DAMAGE,'#c98cff');
     await log(`${e.name}โดนพิษกัดกิน`,560);
@@ -155,7 +170,7 @@ async function enemyTurn(){
   const hit=(mult=1)=>e.atk*mult*rand(.9,1.1)-defOf()/2;
   if(e.kind==='tomato'){
     if(e.charging){
-      e.charging=false;sfx.boom();setMsg('ตูม! มะเขือเทศระเบิดกระจาย!');burst(e.px,e.py,'#d9413f',40);hurtPlayer(hit(2.6),'#ff8a7a');e.hp=0;bt.boom=true;await wait(1000);return;
+      e.charging=false;sfx.boom();setMsg('ตูม! มะเขือเทศระเบิดกระจาย!');burst(e.px,e.py,'#d9413f',40);hurtPlayer(hit(2.6),'#ff8a7a');e.hp=0;e.boomed=true;renderStatus();await wait(1000);bt.active=null;return;
     }
     if(e.turns>=3||e.hp<e.maxhp*.5){e.charging=true;sfx.enc();await log(`${e.name}บวมเป่ง! ฆ่ามันให้ทันในเทิร์นนี้ หรือสั่งป้องกัน`,1200);bt.active=null;return}
     if(Math.random()<.35){setMsg(`${e.name}พ่นน้ำเปรี้ยว!`);sfx.hit();bt.elunge=.25;hurtPlayer(hit(.6),'#c98cff');const ok=tryStatus('poison',3);await log(ok?'ติดพิษ 3 เทิร์น!':resistText(),720);bt.active=null;return}
@@ -187,50 +202,87 @@ async function enemyTurn(){
   }
   bt.elunge=.25;sfx.hit();setMsg(`${e.name}โจมตี${bt.guard?' แต่กันไว้ได้':''}`);hurtPlayer(hit());await wait(620);bt.active=null;
 }
+function makeFoe(spec,slot,total){
+  const{kind,rare,trans}=spec,L=mist(),m=MONSTERS[kind],sc=(1+.15*(L-1))*(rare?1.5:1)*(trans?TRANSCEND_POWER:1);
+  return {kind,rare,trans,boss:!!m.boss,known:false,weak:WEAKNESS[kind][trans?'transcended':'normal'],name:(rare?`${CROPS[kind].name}ทองคำ`:m.name)+(trans?' ก้าวข้าม':''),maxhp:Math.round(m.hp*sc),hp:Math.round(m.hp*sc),atk:m.atk*sc,def:m.def*sc,spd:m.spd,xp:Math.round(m.xp*sc*(rare?2:1)),gold:Math.round(m.gold*sc*(rare?2:1)),slot,px:FOE_SLOTS[total][slot][0],py:FOE_SLOTS[total][slot][1],turns:0,charging:false,boomed:false,status:{blind:0,poison:0,stun:false}};
+}
+// Accepts one monster (kind, rare, trans) or a list of {kind, rare, trans}. At most MAX_FOES fight at once; the rest step in as others fall.
 async function battle(kind,rare,trans=false){
-  const L=mist(),m=MONSTERS[kind],sc=(1+.15*(L-1))*(rare?1.5:1)*(trans?TRANSCEND_POWER:1);
+  const specs=Array.isArray(kind)?kind:[{kind,rare,trans}];
+  const shown=Math.min(MAX_FOES,specs.length);
   await fadeTo(1,160);
-  const e={kind,rare,trans,known:false,weak:WEAKNESS[kind][trans?'transcended':'normal'],name:(rare?`${CROPS[kind].name}ทองคำ`:m.name)+(trans?' ก้าวข้าม':''),maxhp:Math.round(m.hp*sc),hp:Math.round(m.hp*sc),atk:m.atk*sc,def:m.def*sc,spd:m.spd,xp:Math.round(m.xp*sc*(rare?2:1)),gold:Math.round(m.gold*sc*(rare?2:1)),px:92,py:122,turns:0,charging:false,status:{blind:0,poison:0,stun:false}};
-  bt={e,fx:[],floats:[],round:1,active:null,shake:0,eflash:0,pflash:0,elunge:0,plunge:0,boom:false,guard:false,reflect:false,reflectMult:1.5,status:{poison:0,blind:0,stun:false}};
+  const foes=specs.slice(0,shown).map((sp,i)=>makeFoe(sp,i,shown));
+  const queue=specs.slice(shown).map(sp=>makeFoe(sp,0,shown));
+  const all=[...foes,...queue];
+  bt={e:foes[0],foes,queue,cursor:null,fx:[],floats:[],round:1,active:null,shake:0,eflash:0,pflash:0,elunge:0,plunge:0,guard:false,reflect:false,reflectMult:1.5,status:{poison:0,blind:0,stun:false}};
   mode='battle';renderSeeds();renderStatus();
   await fadeTo(0,160);
-  await log(rare?`ร่างหายาก! ${e.name}โผล่ออกมาจากดิน!`:`${e.name}โผล่ออกมาจากดิน!`,800);
-  if(trans)await log('มันดูดพลังอุกกาบาตจนก้าวข้ามจุดอ่อนเดิม! ต้องหาจุดอ่อนใหม่',1100);
+  const fastest=Math.max(...all.map(e=>e.spd));
+  await log(all.length>1?`มอนสเตอร์ ${all.length} ตัวโผล่ออกมาจากดิน!`:all[0].rare?`ร่างหายาก! ${all[0].name}โผล่ออกมาจากดิน!`:`${all[0].name}โผล่ออกมาจากดิน!`,800);
+  if(all.some(e=>e.trans))await log('มีตัวที่ดูดพลังอุกกาบาตจนก้าวข้ามจุดอ่อนเดิม! ต้องหาจุดอ่อนใหม่',1100);
   let res=null;
-  if(spdOf()>e.spd){
-    setMsg(`ความเสี่ยง: ${riskOf(e).name} (พลังรวม ${playerCP()} ต่อ ${foeCP(e)}) เราเร็วกว่า ถอยได้โดยไม่เสียอะไร และกลับมาสู้ตัวเดิมได้`);
+  const risk=riskOf(all);
+  if(spdOf()>fastest){
+    setMsg(`ความเสี่ยง: ${risk.name} (พลังรวม ${playerCP()} ต่อ ${totalCP(all)}) เราเร็วกว่า ถอยได้โดยไม่เสียอะไร และกลับมาสู้ตัวเดิมได้`);
     if(!await choose([{label:'สู้เลย',value:1},{label:'ถอยไปก่อน',value:0}]))res='retreat';
-  }else await log(`เราไม่เร็วกว่ามัน (ความเร็ว ${spdOf()} ต่อ ${e.spd}) ถอยไม่ได้ ต้องสู้!`,1000);
-  if(!res)outer:for(;;){
-    const order=[{w:'p',s:bt.round===1&&perkTier('spd')>=1?99:spdOf()+rand(0,4)},{w:'e',s:e.charging?-99:e.spd+rand(0,4)}].sort((a,b)=>b.s-a.s);
-    bt.first=order[0].w;
-    for(const o of order){
-      if(o.w==='p')await playerTurn();else await enemyTurn();
-      if(G.hp<=0){res='lose';break outer}
-      if(e.hp<=0){res=bt.boom?'boom':'win';break outer}
+  }else await log(`เราไม่เร็วกว่ามอนสเตอร์ (ความเร็ว ${spdOf()} ต่อ ${fastest}) ถอยไม่ได้ ต้องสู้!`,1000);
+  const reinforce=()=>{
+    for(let i=0;i<bt.foes.length&&bt.queue.length;i++)if(bt.foes[i].hp<=0){
+      const n=bt.queue.shift();Object.assign(n,{slot:i,px:bt.foes[i].px,py:bt.foes[i].py});bt.foes[i]=n;
     }
+  };
+  if(!res)outer:for(;;){
+    const order=[{s:bt.round===1&&perkTier('spd')>=1?99:spdOf()+rand(0,4)},...aliveFoes().map(e=>({e,s:e.charging?-99:e.spd+rand(0,4)}))].sort((a,b)=>b.s-a.s);
+    bt.first=order[0].e?'e':'p';
+    for(const o of order){
+      if(o.e&&o.e.hp<=0)continue;
+      if(o.e)await enemyTurn(o.e);else await playerTurn();
+      if(G.hp<=0){res='lose';break outer}
+      if(!aliveFoes().length){
+        reinforce();
+        if(!aliveFoes().length){res=all.some(e=>!e.boomed)?'win':'boom';break outer}
+        await log('มีมอนสเตอร์ตัวใหม่เข้ามาแทน!',700);
+        continue outer;
+      }
+    }
+    reinforce();
     bt.round++;
   }
   bt.active=null;
-  if(res==='win')await victory(e);
-  if(res==='boom')await say(`${e.name}ระเบิดไปแล้ว ของดรอปกระจุยหมด เก็บได้แค่ทอง ${Math.round(e.gold/2)} G`),G.gold+=Math.round(e.gold/2),renderStatus();
+  const boomed=all.filter(e=>e.boomed&&e.hp<=0);
+  if(res==='win'||res==='boom'){
+    if(boomed.length){
+      const g=boomed.reduce((a,e)=>a+Math.round(e.gold/2),0);G.gold+=g;renderStatus();
+      await say(boomed.length>1?`มอนสเตอร์ ${boomed.length} ตัวระเบิดไปแล้ว ของดรอปกระจุยหมด เก็บได้แค่ทอง ${g} G`:`${boomed[0].name}ระเบิดไปแล้ว ของดรอปกระจุยหมด เก็บได้แค่ทอง ${g} G`);
+    }
+    const won=all.filter(e=>!e.boomed);
+    if(won.length)await victory(won);
+  }
   if(res==='lose')await say('หมดแรงแล้ว...');
   await fadeTo(1,160);
   bt=null;mode='script';renderStatus();
   await fadeTo(0,160);
   return res;
 }
-async function victory(e){
+async function victory(list){
+  if(list[0].boss)return bossVictory(list[0]);
   sfx.win();
-  G.gold+=e.gold;
-  G.seen[e.kind][e.rare?'rare':'n']++;
-  const shards=(e.rare?2:Math.random()<.25?1:0)+(e.trans?1:0);G.shards+=shards;
-  const up=gainXP(e.xp);renderStatus();
-  await say(`ชนะแล้ว! ได้ ${e.xp} EXP และ ${e.gold} G${shards?` และเศษอุกกาบาต ${shards} ชิ้น`:''}`);
+  let xp=0,gold=0,shards=0;
+  for(const e of list){
+    xp+=e.xp;gold+=e.gold;
+    G.seen[e.kind][e.rare?'rare':'n']++;
+    shards+=(e.rare?2:Math.random()<.25?1:0)+(e.trans?1:0);
+  }
+  G.gold+=gold;G.shards+=shards;
+  const up=gainXP(xp);renderStatus();
+  await say(`ชนะแล้ว${list.length>1?` ${list.length} ตัว`:''}! ได้ ${xp} EXP และ ${gold} G${shards?` และเศษอุกกาบาต ${shards} ชิ้น`:''}`);
   if(up){
     setMsg(`เลเวลอัปเป็น Lv ${G.lv}! HP และ MP ฟื้นเต็ม ได้แต้มสถานะรวม ${G.points} แต้ม`);
     if(await choose([{label:'อัปสถานะเลย',value:1},{label:'ไว้ทีหลัง',value:0}]))await allocMenu();
   }
+  for(const e of list)await foeDrops(e);
+}
+async function foeDrops(e){
   if(Math.random()<(e.rare?GOLDEN_VEG.rareDrop:GOLDEN_VEG.drop)){
     G.golden++;
     await say(`ได้รับ ${GOLDEN_VEG.name}! กินแล้วฟื้น HP MP SP เต็ม เก็บไว้ในเมนูกินผัก`,'ของดรอป');

@@ -6,7 +6,7 @@ const perCrop=v=>Object.fromEntries(CROP_IDS.map(k=>[k,typeof v==='function'?v()
 function newGame(){
   const plots=[];for(let i=0;i<36;i++)plots.push({c:null,g:0,w:false});
   return {day:1,gold:40,shards:0,lv:1,xp:0,hp:40,pw:10,seeds:{...perCrop(0),carrot:6},veg:perCrop(0),
-    stat:{hp:0,pw:0,atk:0,def:0,spd:0,sta:0},golden:0,points:0,stam:30,items:{},equip:{weapon:null,hat:null,shirt:null},fruits:perCrop(0),power:null,tools:{water:1},plots,land:0,sickle:0,can:0,harvests:0,pity:0,sel:'carrot',
+    stat:{hp:0,pw:0,atk:0,def:0,spd:0,sta:0},golden:0,points:0,stam:30,items:{},equip:{weapon:null,hat:null,shirt:null},fruits:perCrop(0),power:null,tools:{water:1},area:'farm',crater:null,pond:[],fish:{tilapia:0,catfish:0,ruby:0},goldFish:0,plots,land:0,sickle:0,can:0,harvests:0,pity:0,sel:'carrot',
     seen:perCrop(()=>({n:0,rare:0})),x:4,y:5};
 }
 const SAVE='mist-garden-save-v1';
@@ -38,7 +38,7 @@ function importCode(text){
 }
 const mist=()=>Math.min(9,1+Math.floor((G.day-1)/7));
 const landSize=()=>4+G.land;
-const plotAt=(x,y)=>{const a=x-PX,b=y-PY;return a>=0&&b>=0&&a<6&&b<6?{i:b*6+a,a,b,unlocked:a<landSize()&&b<landSize()}:null};
+const plotAt=(x,y)=>{if(G&&G.area==='crater')return null;const a=x-PX,b=y-PY;return a>=0&&b>=0&&a<6&&b<6?{i:b*6+a,a,b,unlocked:a<landSize()&&b<landSize()}:null};
 function gearBonus(slot){const id=G.equip[slot];if(!id)return 0;const base=GEAR[itemCrop(id)][slot][1],lv=G.items[id]||1;return base+(lv-1)*(slot==='hat'?3:1)}
 function setCount(crop){return SLOTS.filter(s=>G.equip[s]&&itemCrop(G.equip[s])===crop).length}
 // Food always heals at least the weakest monster's current attack + 5, so eating stays worth a turn as mist rises.
@@ -85,6 +85,7 @@ function normalizeSave(g){
   if(upgraded)g.points=(g.lv-1)*POINTS_PER_LEVEL;
   if(g.stam===undefined)g.stam=30+(g.lv-1)*2;
   g.golden=g.golden||0;
+  g.area=g.area||'farm';g.crater=g.crater||null;g.pond=g.pond||[];g.fish={tilapia:0,catfish:0,ruby:0,...g.fish};g.goldFish=g.goldFish||0;
   g.seeds={...perCrop(0),...g.seeds};g.veg={...perCrop(0),...g.veg};g.fruits={...perCrop(0),...g.fruits};g.seen={...perCrop(()=>({n:0,rare:0})),...g.seen};
   g.power=g.power||null;
   g.tools={water:1,...g.tools};
@@ -98,7 +99,8 @@ function useStamina(n){
 const combatPower=(hp,atk,def,spd)=>Math.round(hp*CP_WEIGHT.hp+atk*CP_WEIGHT.atk+def*CP_WEIGHT.def+spd*CP_WEIGHT.spd);
 const playerCP=()=>combatPower(maxHP(),atkOf(),defOf(),spdOf());
 const foeCP=e=>combatPower(e.maxhp,e.atk,e.def,e.spd);
-const riskOf=e=>RISK_LEVELS.find(r=>playerCP()/foeCP(e)>=r.min);
+const riskOf=foes=>{const total=foes.reduce((a,e)=>a+foeCP(e),0);return RISK_LEVELS.find(r=>playerCP()/total>=r.min)};
+const totalCP=foes=>foes.reduce((a,e)=>a+foeCP(e),0);
 const farmLevel=()=>Math.min(MAX_FARM_LEVEL,1+Math.floor(G.harvests/HARVESTS_PER_FARM_LEVEL));
 const toolPower=()=>TOOL_BASE+farmLevel()*TOOL_PER_FARM_LEVEL;
 const transcendChance=()=>Math.min(.3,.05+.03*(mist()-1));
