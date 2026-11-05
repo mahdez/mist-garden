@@ -287,7 +287,7 @@ async function fruitMenu(){
   const have=CROP_IDS.filter(k=>G.fruits[k]>0);
   if(!have.length){setMsg('ยังไม่มีผลปีศาจ ปราบมอนสเตอร์เพื่อรับผลปีศาจ');await wait(1100);return}
   setMsg(G.power?`พลังตอนนี้: ${FRUITS[G.power].skill} ถ้ากินผลใหม่ พลังเดิมจะหายไป`:'กินผลปีศาจเพื่อรับสกิลพิเศษ ใช้ได้ในการต่อสู้');
-  const v=await choose(have.map(k=>({label:`${FRUITS[k].name} × ${G.fruits[k]}`,sub:G.power===k?'กินอยู่':`${FRUITS[k].skill}: ${FRUITS[k].note}`,value:k,disabled:G.power===k})),{cancel:true});
+  const v=await choose(have.map(k=>({label:`${FRUITS[k].name} × ${G.fruits[k]}`,sub:G.power===k?'กินอยู่':`${FRUITS[k].skill}: ${FRUITS[k].note} · ${RES_LABEL[FRUITS[k].res]} ${FRUITS[k].cost}`,value:k,disabled:G.power===k})),{cancel:true});
   if(!v)return;
   G.fruits[v]--;G.power=v;sfx.heal();renderStatus();saveSoon();
   await say(`ได้พลังใหม่! ใช้สกิล ${FRUITS[v].skill} ได้ในเมนูสกิล จนกว่าจะกินผลปีศาจอื่น`);
@@ -300,9 +300,9 @@ async function gearMenu(){
     const owned=Object.keys(G.items).filter(i=>itemSlot(i)===slot);
     if(!owned.length){setMsg('ยังไม่มีของในช่องนี้ ชนะมอนสเตอร์ผักเพื่อรับของ');await wait(1100);continue}
     setMsg(`เลือก${SLOT_NAME[slot]}ที่จะใส่`);
-    const v=await choose([{label:'ถอดออก',value:'off',disabled:!G.equip[slot]},...owned.map(i=>({label:`${itemName(i)} +${G.items[i]-1}`,sub:`ชุด${CROPS[itemCrop(i)].name}${G.equip[slot]===i?' · ใส่อยู่':''}`,value:i}))],{cancel:true});
+    const v=await choose([{label:'ถอดออก',value:'off',disabled:!G.equip[slot]},...owned.map(i=>({label:`${itemName(i)} +${G.items[i]-1}`,sub:`${itemInfo(i)} · ${meetsReq(i)?(G.equip[slot]===i?'ใส่อยู่':reqText(i)):`❌ ${reqText(i)}`}${slot==='weapon'?` · สกิล ${WEAPON_SKILLS[itemCrop(i)].name}`:` · ชุด${CROPS[itemCrop(i)].name}`}`,value:i,disabled:!meetsReq(i)||G.equip[slot]===i}))],{cancel:true});
     if(!v)continue;
-    G.equip[slot]=v==='off'?null:v;sfx.ok();renderStatus();saveSoon();
+    G.equip[slot]=v==='off'?null:v;G.hp=Math.min(G.hp,maxHP());G.pw=Math.min(G.pw,maxPW());G.stam=Math.min(G.stam,maxStam());sfx.ok();renderStatus();saveSoon();
   }
 }
 async function bookMenu(){

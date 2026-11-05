@@ -12,6 +12,9 @@ function foeStatus(){
   const e=bt.e,tags=[];
   if(e.rare)tags.push('<span class="set">ร่างทองคำ</span>');
   if(e.charging)tags.push('<span class="bad">กำลังเตรียมโจมตีหนัก</span>');
+  if(e.status.poison>0)tags.push(`<span class="bad">ติดพิษ ${e.status.poison} เทิร์น</span>`);
+  if(e.status.blind>0)tags.push(`<span class="bad">ตาพร่า ${e.status.blind} เทิร์น</span>`);
+  if(e.status.stun)tags.push('<span class="bad">มึนงง</span>');
   return `<div class="foe"><div class="row"><b>${e.name}</b><small>HP ${e.hp}/${e.maxhp}</small></div>
     <div class="bar hp ${e.hp/e.maxhp<.3?'low':''}"><i style="width:${e.hp/e.maxhp*100}%"></i></div>
     <div class="stats"><span>โจมตี ${Math.round(e.atk)}</span><span>ป้องกัน ${Math.round(e.def)}</span><span>ความเร็ว ${e.spd}</span></div>

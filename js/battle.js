@@ -22,6 +22,9 @@ function hurtEnemy(d,col){
 }
 function hurtPlayer(d,col){
   bt.dodged=false;
+  if(bt.e.status.blind>0&&Math.random()<FOE_BLIND_MISS){
+    bt.dodged=true;sfx.miss();setMsg(`${bt.e.name}ตาพร่า ตีพลาด!`);renderStatus();return 0;
+  }
   if(Math.random()<dodgeChance()){
     bt.dodged=true;sfx.miss();burst(pos('p').x,pos('p').y,'#d8f0ff',6);setMsg('หลบได้!');renderStatus();return 0;
   }
@@ -68,11 +71,24 @@ async function playerTurn(){
       break;
     }
     if(cmd==='skill'){
-      setMsg(`ใช้สกิลอะไร? MP ${G.pw}/${maxPW()}`);
-      const sk=await choose([{label:'ฟันเต็มแรง',sub:'โจมตี 1.8 เท่า · MP 3',value:'slash',disabled:G.pw<3},{label:'ตั้งหลัก',sub:'ฟื้น HP 25% · MP 4',value:'rest',disabled:G.pw<4},...(G.power?[{label:FRUITS[G.power].skill,sub:`${FRUITS[G.power].note} · MP ${FRUITS[G.power].pw}`,value:'power',disabled:G.pw<FRUITS[G.power].pw}]:[])],{cancel:true});
+      setMsg(`ใช้สกิลอะไร? SP ${G.stam}/${maxStam()} · MP ${G.pw}/${maxPW()}`);
+      const sk=await choose([{label:'ฟันเต็มแรง',sub:'โจมตี 1.8 เท่า · SP 3',value:'slash',disabled:G.stam<3},{label:'ตั้งหลัก',sub:'ฟื้น HP 25% · MP 4',value:'rest',disabled:G.pw<4},...(G.equip.weapon?[(()=>{const w=WEAPON_SKILLS[itemCrop(G.equip.weapon)];return {label:w.name,sub:`${w.note} · SP ${w.cost}`,value:'weapon',disabled:G.stam<w.cost}})()]:[]),...(G.power?[{label:FRUITS[G.power].skill,sub:`${FRUITS[G.power].note} · ${RES_LABEL[FRUITS[G.power].res]} ${FRUITS[G.power].cost}`,value:'power',disabled:G[FRUITS[G.power].res]<FRUITS[G.power].cost}]:[])],{cancel:true});
       if(!sk)continue;
+      if(sk==='weapon'){
+        const w=WEAPON_SKILLS[itemCrop(G.equip.weapon)];
+        G.stam-=w.cost;renderStatus();bt.plunge=.25;const r=playerAttack(w.mult);
+        if(r.miss){sfx.miss();await log(`${w.name}พลาด!`,620);break}
+        sfx.crit();setMsg(`${w.name}!`);hurtEnemy(r.d,'#ffcf6b');await wait(420);
+        if(bt.e.hp>0){
+          if(Math.random()<w.chance){
+            bt.e.status[w.status]=w.status==='stun'?true:w.turns;renderStatus();
+            await log(`${bt.e.name}${FOE_STATUS_TEXT[w.status]}!`,640);
+          }else await log(`${bt.e.name}ต้านไว้ได้`,560);
+        }
+        break;
+      }
       if(sk==='power'){
-        const f=FRUITS[G.power];G.pw-=f.pw;renderStatus();
+        const f=FRUITS[G.power];G[f.res]-=f.cost;renderStatus();
         if(G.power==='pumpkin'){bt.guard=true;bt.reflect=true;sfx.ok();renderStatus();await log(`${f.skill}! รับความเสียหายครึ่งเดียว และสะท้อนการโจมตีครั้งถัดไป`,760);break}
         bt.plunge=.25;sfx.crit();
         if(G.power==='carrot'){setMsg(`${f.skill}! เล็งเข้าจุดสำคัญ`);hurtEnemy(playerAttack(1.4,true).d,'#ffcf6b');await wait(640);break}
@@ -82,7 +98,7 @@ async function playerTurn(){
         G.hp=Math.max(1,G.hp-Math.round(maxHP()*.1));bt.pflash=.22;renderStatus();await wait(700);break;
       }
       if(sk==='slash'){
-        G.pw-=3;renderStatus();bt.plunge=.25;const r=playerAttack(1.8);
+        G.stam-=3;renderStatus();bt.plunge=.25;const r=playerAttack(1.8);
         if(r.miss){sfx.miss();await log('ฟันพลาด!',620);break}
         sfx.crit();setMsg(r.crit?'ฟันเต็มแรงเข้าจุดสำคัญ!':'ฟันเต็มแรง!');hurtEnemy(r.d,'#ffcf6b');await wait(640);break;
       }
@@ -99,6 +115,16 @@ async function playerTurn(){
 }
 async function enemyTurn(){
   const e=bt.e;bt.active='e';e.turns++;
+  if(e.status.poison>0){
+    e.status.poison--;hurtEnemy(e.maxhp*FOE_POISON_DAMAGE,'#c98cff');
+    await log(`${e.name}โดนพิษกัดกิน`,560);
+    if(e.hp<=0){bt.active=null;return}
+  }
+  if(e.status.blind>0)e.status.blind--;
+  if(e.status.stun){
+    e.status.stun=false;renderStatus();
+    await log(`${e.name}มึนงง เสียเทิร์นนี้`,760);bt.active=null;return;
+  }
   const hit=(mult=1)=>e.atk*mult*rand(.9,1.1)-defOf()/2;
   if(e.kind==='tomato'){
     if(e.charging){
@@ -125,7 +151,7 @@ async function enemyTurn(){
 async function battle(kind,rare){
   const L=mist(),m=MONSTERS[kind],sc=(1+.15*(L-1))*(rare?1.5:1);
   await fadeTo(1,160);
-  const e={kind,rare,name:(rare?`${CROPS[kind].name}ทองคำ`:m.name),maxhp:Math.round(m.hp*sc),hp:Math.round(m.hp*sc),atk:m.atk*sc,def:m.def*sc,spd:m.spd,xp:Math.round(m.xp*sc*(rare?2:1)),gold:Math.round(m.gold*sc*(rare?2:1)),px:92,py:122,turns:0,charging:false};
+  const e={kind,rare,name:(rare?`${CROPS[kind].name}ทองคำ`:m.name),maxhp:Math.round(m.hp*sc),hp:Math.round(m.hp*sc),atk:m.atk*sc,def:m.def*sc,spd:m.spd,xp:Math.round(m.xp*sc*(rare?2:1)),gold:Math.round(m.gold*sc*(rare?2:1)),px:92,py:122,turns:0,charging:false,status:{blind:0,poison:0,stun:false}};
   bt={e,fx:[],floats:[],round:1,active:null,shake:0,eflash:0,pflash:0,elunge:0,plunge:0,boom:false,guard:false,reflect:false,status:{poison:0,blind:0,stun:false}};
   mode='battle';renderSeeds();renderStatus();
   await fadeTo(0,160);
@@ -190,8 +216,9 @@ async function dropItem(kind){
   sfx.coin();
   if(!G.items[id]){
     G.items[id]=1;
-    setMsg(`ได้รับ ${name}!`,'ของดรอป');
-    const a=await choose([{label:'ใส่เลย',value:1},{label:'เก็บไว้ก่อน',value:0}]);
+    const canWear=meetsReq(id);
+    setMsg(`ได้รับ ${name}! ${itemInfo(id)} · ${reqText(id)}`,'ของดรอป');
+    const a=await choose([{label:'ใส่เลย',sub:canWear?'':'สถานะยังไม่ถึง',value:1,disabled:!canWear},{label:'เก็บไว้ก่อน',value:0}]);
     if(a){G.equip[slot]=id;renderStatus()}
     const n=SLOTS.filter(s=>G.items[itemId(kind,s)]).length;
     if(n===2)await say(`รู้จักชุด${CROPS[kind].name}แล้ว ใส่ 2 ชิ้นได้โบนัส ${CROPS[kind].set2}`,'ชุดไอเทม');

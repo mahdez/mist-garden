@@ -46,12 +46,31 @@ const lowestAtk=()=>Math.min(...Object.values(MONSTERS).map(m=>m.atk))*(1+.15*(m
 const eatHeal=k=>Math.round(Math.max(CROPS[k].eat,Math.round(lowestAtk())+HEAL_BONUS)*(perkTier('hp')>=2?1.5:1));
 const perkTier=k=>PERKS[k].filter(p=>(G.stat&&G.stat[k]||0)>=p.at).length;
 const statPts=k=>(G.stat&&G.stat[k]||0)*STATS[k].per;
-const maxHP=()=>40+(G.lv-1)*4+gearBonus('hat')+statPts('hp');
-const maxPW=()=>10+(G.lv-1)+statPts('pw');
-const maxStam=()=>30+(G.lv-1)*2+statPts('sta');
-const atkOf=()=>6+(G.lv-1)*.5+G.sickle*2+gearBonus('weapon')+statPts('atk');
-const defOf=()=>3+gearBonus('shirt')+statPts('def');
-const spdOf=()=>6+(G.lv-1)*.25+statPts('spd');
+const gearExtra=k=>SLOTS.reduce((sum,s)=>{const id=G.equip[s];return sum+(id&&GEAR[itemCrop(id)][s][2][k]||0)},0);
+const gearDef=id=>GEAR[itemCrop(id)][itemSlot(id)];
+const meetsReq=id=>Object.entries(gearDef(id)[3]).every(([k,v])=>(G.stat[k]||0)>=v);
+function reqText(id){
+  const r=Object.entries(gearDef(id)[3]);
+  return r.length?`ต้องลง ${r.map(([k,v])=>`${STAT_SHORT[k]} ${v}`).join(', ')}`:'ใส่ได้เลย';
+}
+function itemInfo(id){
+  const d=gearDef(id),slot=itemSlot(id),lv=(G.items[id]||1)-1,main=d[1]+lv*(slot==='hat'?3:1);
+  const stats={[SLOT_MAIN[slot]]:main,...d[2]};
+  if(d[2][SLOT_MAIN[slot]])stats[SLOT_MAIN[slot]]=main+d[2][SLOT_MAIN[slot]];
+  return Object.entries(stats).map(([k,v])=>`${STAT_SHORT[k]} +${v}`).join(' · ');
+}
+// Worn gear must always meet its requirement, including gear from saves made before requirements existed.
+function removeUnmetGear(){
+  const off=[];
+  for(const s of SLOTS){const id=G.equip[s];if(id&&!meetsReq(id)){off.push(itemName(id));G.equip[s]=null}}
+  return off;
+}
+const maxHP=()=>40+(G.lv-1)*4+gearBonus('hat')+gearExtra('hp')+statPts('hp');
+const maxPW=()=>10+(G.lv-1)+gearExtra('pw')+statPts('pw');
+const maxStam=()=>30+(G.lv-1)*2+gearExtra('sta')+statPts('sta');
+const atkOf=()=>6+(G.lv-1)*.5+G.sickle*2+gearBonus('weapon')+gearExtra('atk')+statPts('atk');
+const defOf=()=>3+gearBonus('shirt')+gearExtra('def')+statPts('def');
+const spdOf=()=>6+(G.lv-1)*.25+gearExtra('spd')+statPts('spd');
 const doubleChance=()=>Math.min(.45,(G.stat&&G.stat.spd||0)*SPD_DOUBLE_PER_POINT);
 const dodgeChance=()=>Math.min(.35,(G.stat&&G.stat.spd||0)*SPD_DODGE_PER_POINT);
 const hitChance=()=>setCount('carrot')>=3?1:.92;

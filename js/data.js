@@ -13,10 +13,11 @@ const CROPS={
 const CROP_IDS=['carrot','tomato','pumpkin'];
 const SLOTS=['weapon','hat','shirt'];
 const SLOT_NAME={weapon:'อาวุธ',hat:'หมวก',shirt:'เสื้อ'};
+// Each piece: [name, main stat, bonus stats, required invested stat points].
 const GEAR={
-  carrot:{weapon:['ดาบแครอท',3],hat:['หมวกใบแครอท',6],shirt:['เสื้อแครอท',2],cloth:'#e8862e'},
-  tomato:{weapon:['ค้อนมะเขือเทศ',4],hat:['หมวกมะเขือเทศ',9],shirt:['เสื้อมะเขือเทศ',3],cloth:'#cf3f3a'},
-  pumpkin:{weapon:['กระบองฟักทอง',5],hat:['หมวกฟักทอง',12],shirt:['เกราะฟักทอง',4],cloth:'#b9742a'},
+  carrot:{weapon:['ดาบแครอท',3,{spd:.5},{spd:1}],hat:['หมวกใบแครอท',6,{spd:.5},{}],shirt:['เสื้อแครอท',2,{sta:5},{}],cloth:'#e8862e'},
+  tomato:{weapon:['ค้อนมะเขือเทศ',4,{hp:5},{atk:2}],hat:['หมวกมะเขือเทศ',9,{pw:2},{hp:1}],shirt:['เสื้อมะเขือเทศ',3,{hp:5},{def:1}],cloth:'#cf3f3a'},
+  pumpkin:{weapon:['กระบองฟักทอง',5,{def:1},{atk:4}],hat:['หมวกฟักทอง',12,{def:1},{hp:2}],shirt:['เกราะฟักทอง',4,{hp:6},{def:3}],cloth:'#b9742a'},
 };
 const itemId=(crop,slot)=>crop+'_'+slot;
 const itemCrop=id=>id.split('_')[0];
@@ -47,13 +48,24 @@ const PERKS={
 };
 // Speed points also add battle chances per point invested.
 const SPD_DOUBLE_PER_POINT=.04,SPD_DODGE_PER_POINT=.03;
+const STAT_SHORT={hp:'HP',pw:'MP',atk:'STR',def:'ป้องกัน',spd:'ความเร็ว',sta:'SP'};
+const SLOT_MAIN={weapon:'atk',hat:'hp',shirt:'def'};
 const STAMINA_COST={plant:1,water:1,harvest:1};
 const FOOD_STAMINA={carrot:2,tomato:1,pumpkin:6};
 const GOLDEN_VEG={name:'ผักทอง',drop:.2,rareDrop:1};
+// Weapon, fruit, and physical attack skills spend SP (stam). Recovery skills spend MP (pw).
+const WEAPON_SKILLS={
+  carrot:{name:'ฟันแสบตา',cost:4,mult:1,status:'blind',turns:3,chance:.8,note:'80% ทำให้ตาพร่า 3 เทิร์น ตีพลาดง่าย'},
+  tomato:{name:'ทุบน้ำเปรี้ยว',cost:5,mult:1,status:'poison',turns:3,chance:1,note:'ทำให้ติดพิษ 3 เทิร์น เสีย HP ทุกเทิร์น'},
+  pumpkin:{name:'ทุบหัวมึน',cost:6,mult:1.2,status:'stun',turns:1,chance:.5,note:'50% ทำให้มึนงง เสียเทิร์นถัดไป'},
+};
+const FOE_STATUS_TEXT={blind:'ตาพร่า',poison:'ติดพิษ',stun:'มึนงง'};
+const FOE_BLIND_MISS=.4,FOE_POISON_DAMAGE=.08;
+const RES_LABEL={stam:'SP',pw:'MP'};
 const FRUITS={
-  carrot:{name:'ผลปีศาจแครอท',skill:'ตาเหยี่ยว',pw:4,note:'ตีแรง 1.4 เท่า คริติคอลแน่นอน'},
-  tomato:{name:'ผลปีศาจมะเขือเทศ',skill:'ระเบิดฉ่ำ',pw:5,note:'ตีแรง 3 เท่า เสีย HP 10%'},
-  pumpkin:{name:'ผลปีศาจฟักทอง',skill:'เปลือกเหล็ก',pw:4,note:'ป้องกันและสะท้อน 1.5 เท่าของการโจมตีครั้งถัดไป'},
+  carrot:{name:'ผลปีศาจแครอท',skill:'ตาเหยี่ยว',res:'stam',cost:4,note:'ตีแรง 1.4 เท่า คริติคอลแน่นอน'},
+  tomato:{name:'ผลปีศาจมะเขือเทศ',skill:'ระเบิดฉ่ำ',res:'stam',cost:5,note:'ตีแรง 3 เท่า เสีย HP 10%'},
+  pumpkin:{name:'ผลปีศาจฟักทอง',skill:'เปลือกเหล็ก',res:'stam',cost:4,note:'ป้องกันและสะท้อน 1.5 เท่าของการโจมตีครั้งถัดไป'},
 };
 const SPR={
   carrot:{pal:{k:'#3a1a08',o:'#f28a2c',d:'#c9651a',l:'#ffb45e',g:'#3fa34d',h:'#2a7a3a',w:'#ffffff',e:'#1a0a04'},gold:{o:'#ffd34a',d:'#c99a1f',l:'#fff0a0',g:'#c4a8f5',h:'#8d6fd0'},rows:[
