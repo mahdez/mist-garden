@@ -5,7 +5,7 @@ let fxMap=[],floatsMap=[];
 function newGame(){
   const plots=[];for(let i=0;i<36;i++)plots.push({c:null,g:0,w:false});
   return {day:1,gold:40,shards:0,lv:1,xp:0,hp:40,pw:10,seeds:{carrot:6,tomato:0,pumpkin:0},veg:{carrot:0,tomato:0,pumpkin:0},
-    stat:{hp:0,pw:0,atk:0,def:0,spd:0,sta:0},golden:0,points:0,stam:30,items:{},equip:{weapon:null,hat:null,shirt:null},fruits:{carrot:0,tomato:0,pumpkin:0},power:null,plots,land:0,sickle:0,can:0,harvests:0,pity:0,sel:'carrot',
+    stat:{hp:0,pw:0,atk:0,def:0,spd:0,sta:0},golden:0,points:0,stam:30,items:{},equip:{weapon:null,hat:null,shirt:null},fruits:{carrot:0,tomato:0,pumpkin:0},power:null,tools:{water:1},plots,land:0,sickle:0,can:0,harvests:0,pity:0,sel:'carrot',
     seen:{carrot:{n:0,rare:0},tomato:{n:0,rare:0},pumpkin:{n:0,rare:0}},x:4,y:5};
 }
 const SAVE='mist-garden-save-v1';
@@ -82,6 +82,7 @@ function normalizeSave(g){
   if(upgraded)g.points=(g.lv-1)*POINTS_PER_LEVEL;
   if(g.stam===undefined)g.stam=30+(g.lv-1)*2;
   g.golden=g.golden||0;
+  g.tools={water:1,...g.tools};
   return upgraded;
 }
 function useStamina(n){
@@ -89,5 +90,12 @@ function useStamina(n){
   if(G.stam<n){note('SP หมดแล้ว เข้าบ้านไปนอนเพื่อฟื้น หรือกินผักในเมนู');sfx.back();return false}
   G.stam-=n;renderStatus();return true;
 }
+const combatPower=(hp,atk,def,spd)=>Math.round(hp*CP_WEIGHT.hp+atk*CP_WEIGHT.atk+def*CP_WEIGHT.def+spd*CP_WEIGHT.spd);
+const playerCP=()=>combatPower(maxHP(),atkOf(),defOf(),spdOf());
+const foeCP=e=>combatPower(e.maxhp,e.atk,e.def,e.spd);
+const riskOf=e=>RISK_LEVELS.find(r=>playerCP()/foeCP(e)>=r.min);
+const farmLevel=()=>Math.min(MAX_FARM_LEVEL,1+Math.floor(G.harvests/HARVESTS_PER_FARM_LEVEL));
+const toolPower=()=>TOOL_BASE+farmLevel()*TOOL_PER_FARM_LEVEL;
+const transcendChance=()=>Math.min(.3,.05+.03*(mist()-1));
 const xpNext=()=>Math.floor(15*G.lv**1.5);
 

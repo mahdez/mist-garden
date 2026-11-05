@@ -50,6 +50,23 @@ const PERKS={
 const SPD_DOUBLE_PER_POINT=.04,SPD_DODGE_PER_POINT=.03;
 const STAT_SHORT={hp:'HP',pw:'MP',atk:'STR',def:'ป้องกัน',spd:'ความเร็ว',sta:'SP'};
 const SLOT_MAIN={weapon:'atk',hat:'hp',shirt:'def'};
+// Combat power is display-only: it never changes damage or unlocks anything.
+const CP_WEIGHT={hp:1,atk:5,def:4,spd:3};
+const RISK_LEVELS=[{min:1,name:'ง่าย',cls:'set'},{min:.7,name:'สูสี',cls:''},{min:0,name:'อันตราย',cls:'bad'}];
+// Farm tools deal fixed damage from farming experience, so they work for every build.
+const TOOLS={
+  water:{name:'ถังน้ำ',el:'น้ำ',cost:4,price:0,act:'สาดน้ำใส่',col:'#7fb8e8'},
+  fire:{name:'คบเพลิง',el:'ไฟ',cost:4,price:30,act:'ใช้คบเพลิงเผา',col:'#ff8a3c'},
+  salt:{name:'ถุงเกลือ',el:'เกลือ',cost:4,price:40,act:'โรยเกลือใส่',col:'#f4f0e6'},
+  dig:{name:'พลั่วขุดราก',el:'ขุดราก',cost:4,price:50,act:'ใช้พลั่วขุดราก',col:'#c9a673'},
+};
+const TOOL_BASE=6,TOOL_PER_FARM_LEVEL=2,HARVESTS_PER_FARM_LEVEL=25,MAX_FARM_LEVEL=10,TOOL_WEAK=1.5,TOOL_OLD_WEAK=.5;
+const WEAKNESS={
+  carrot:{normal:'water',reason:'แครอทเป็นพืชหัว รากเน่าง่ายเมื่อดินแฉะน้ำขัง',transcended:'fire'},
+  tomato:{normal:'fire',reason:'มะเขือเทศไม่ทนร้อนจัด ดอกร่วงและติดผลยากเมื่ออากาศร้อนมาก',transcended:'salt'},
+  pumpkin:{normal:'dig',reason:'ฟักทองมีระบบรากตื้น รากจึงเสียหายง่ายเมื่อถูกรบกวน',transcended:'water'},
+};
+const TRANSCEND_POWER=1.25;
 const STAMINA_COST={plant:1,water:1,harvest:1};
 const FOOD_STAMINA={carrot:2,tomato:1,pumpkin:6};
 const GOLDEN_VEG={name:'ผักทอง',drop:.2,rareDrop:1};

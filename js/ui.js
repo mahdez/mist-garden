@@ -10,14 +10,18 @@ function statusTags(){
 function foeStatus(){
   if(!bt)return '';
   const e=bt.e,tags=[];
+  const risk=riskOf(e);
+  tags.push(`<span class="${risk.cls}">ความเสี่ยง: ${risk.name}</span>`);
   if(e.rare)tags.push('<span class="set">ร่างทองคำ</span>');
+  if(e.trans)tags.push('<span class="bad">ก้าวข้ามจุดอ่อน</span>');
+  if(e.known||(!e.trans&&G.seen[e.kind].known))tags.push(`<span class="set">แพ้${TOOLS[e.weak].el}</span>`);
   if(e.charging)tags.push('<span class="bad">กำลังเตรียมโจมตีหนัก</span>');
   if(e.status.poison>0)tags.push(`<span class="bad">ติดพิษ ${e.status.poison} เทิร์น</span>`);
   if(e.status.blind>0)tags.push(`<span class="bad">ตาพร่า ${e.status.blind} เทิร์น</span>`);
   if(e.status.stun)tags.push('<span class="bad">มึนงง</span>');
   return `<div class="foe"><div class="row"><b>${e.name}</b><small>HP ${e.hp}/${e.maxhp}</small></div>
     <div class="bar hp ${e.hp/e.maxhp<.3?'low':''}"><i style="width:${e.hp/e.maxhp*100}%"></i></div>
-    <div class="stats"><span>โจมตี ${Math.round(e.atk)}</span><span>ป้องกัน ${Math.round(e.def)}</span><span>ความเร็ว ${e.spd}</span></div>
+    <div class="stats"><span>พลังรวม ${foeCP(e)}</span><span>โจมตี ${Math.round(e.atk)}</span><span>ป้องกัน ${Math.round(e.def)}</span><span>ความเร็ว ${e.spd}</span></div>
     <div class="tags">${tags.join('')}</div></div>`;
 }
 function renderStatus(){
@@ -29,7 +33,7 @@ function renderStatus(){
     <div class="bar hp ${G.hp/mh<.3?'low':''}"><i style="width:${G.hp/mh*100}%"></i></div>
     <div class="bar pw"><i style="width:${G.pw/mp*100}%"></i></div>
     <div class="bar st"><i style="width:${Math.min(100,G.stam/maxStam()*100)}%"></i></div>
-    <div class="stats"><span>โจมตี ${Math.round(atkOf())}</span><span>ป้องกัน ${Math.round(defOf())}</span><span>ความเร็ว ${spdOf()}</span></div>
+    <div class="stats"><span>พลังรวม ${playerCP()}</span><span>โจมตี ${Math.round(atkOf())}</span><span>ป้องกัน ${Math.round(defOf())}</span><span>ความเร็ว ${spdOf()}</span></div>
     <div class="tags">${statusTags()}</div>${foeStatus()}`;
   $('#info').innerHTML=`วันที่ ${G.day} · <span class="m">หมอกระดับ ${mist()}</span> · <b>${G.gold} G</b> · เศษอุกกาบาต ${G.shards}`;
 }

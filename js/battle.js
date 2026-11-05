@@ -58,7 +58,7 @@ async function playerTurn(){
   renderStatus();
   for(;;){
     setMsg('จะทำอะไรดี?',`เทิร์นที่ ${bt.round} · ${bt.first==='p'?'เราออกก่อน':`${bt.e.name}ออกก่อน`}`);
-    const cmd=await choose([{label:'โจมตี',value:'atk'},{label:'สกิล',value:'skill'},{label:'กินผัก',value:'eat',disabled:!eatList().length},{label:'ป้องกัน',value:'guard'}],{cols:2});
+    const cmd=await choose([{label:'โจมตี',value:'atk'},{label:'สกิล',value:'skill'},{label:'เครื่องมือ',value:'tool'},{label:'กินผัก',value:'eat',disabled:!eatList().length},{label:'ป้องกัน',value:'guard'}],{cols:2});
     if(cmd==='atk'){
       bt.plunge=.25;const r=playerAttack(1);
       if(r.miss){sfx.miss();await log('ตีพลาด!',620);break}
@@ -68,6 +68,18 @@ async function playerTurn(){
         if(r2.miss){sfx.miss();await log('โจมตีเบิ้ล แต่พลาด!',560)}
         else{sfx.hit();setMsg('เร็วจนโจมตีเบิ้ล!');hurtEnemy(r2.d);await wait(620)}
       }
+      break;
+    }
+    if(cmd==='tool'){
+      setMsg(`ใช้เครื่องมืออะไร? SP ${G.stam}/${maxStam()} · ระดับเกษตร ${farmLevel()}`);
+      const k=await choose(Object.keys(G.tools).map(id=>({label:TOOLS[id].name,sub:`ธาตุ${TOOLS[id].el} · SP ${TOOLS[id].cost}`,value:id,disabled:G.stam<TOOLS[id].cost})),{cancel:true});
+      if(!k)continue;
+      const t=TOOLS[k],e=bt.e,isWeak=e.weak===k,oldWeak=e.trans&&WEAKNESS[e.kind].normal===k;
+      G.stam-=t.cost;bt.plunge=.25;isWeak?sfx.crit():sfx.hit();
+      hurtEnemy(toolPower()*(isWeak?TOOL_WEAK:oldWeak?TOOL_OLD_WEAK:1),t.col);burst(e.px,e.py,t.col,18);
+      if(isWeak){e.known=true;if(!e.trans)G.seen[e.kind].known=1}
+      renderStatus();
+      await log(isWeak?`${t.act}${e.name}! โดนจุดอ่อน${t.el} แรงขึ้นมาก`:oldWeak?`${e.name}ไม่กลัว${t.el}อีกแล้ว แทบไม่สะดุ้ง`:`${t.act}${e.name}`,760);
       break;
     }
     if(cmd==='skill'){
@@ -148,17 +160,18 @@ async function enemyTurn(){
   }
   bt.elunge=.25;sfx.hit();setMsg(`${e.name}โจมตี${bt.guard?' แต่กันไว้ได้':''}`);hurtPlayer(hit());await wait(620);bt.active=null;
 }
-async function battle(kind,rare){
-  const L=mist(),m=MONSTERS[kind],sc=(1+.15*(L-1))*(rare?1.5:1);
+async function battle(kind,rare,trans=false){
+  const L=mist(),m=MONSTERS[kind],sc=(1+.15*(L-1))*(rare?1.5:1)*(trans?TRANSCEND_POWER:1);
   await fadeTo(1,160);
-  const e={kind,rare,name:(rare?`${CROPS[kind].name}ทองคำ`:m.name),maxhp:Math.round(m.hp*sc),hp:Math.round(m.hp*sc),atk:m.atk*sc,def:m.def*sc,spd:m.spd,xp:Math.round(m.xp*sc*(rare?2:1)),gold:Math.round(m.gold*sc*(rare?2:1)),px:92,py:122,turns:0,charging:false,status:{blind:0,poison:0,stun:false}};
+  const e={kind,rare,trans,known:false,weak:WEAKNESS[kind][trans?'transcended':'normal'],name:(rare?`${CROPS[kind].name}ทองคำ`:m.name)+(trans?' ก้าวข้าม':''),maxhp:Math.round(m.hp*sc),hp:Math.round(m.hp*sc),atk:m.atk*sc,def:m.def*sc,spd:m.spd,xp:Math.round(m.xp*sc*(rare?2:1)),gold:Math.round(m.gold*sc*(rare?2:1)),px:92,py:122,turns:0,charging:false,status:{blind:0,poison:0,stun:false}};
   bt={e,fx:[],floats:[],round:1,active:null,shake:0,eflash:0,pflash:0,elunge:0,plunge:0,boom:false,guard:false,reflect:false,status:{poison:0,blind:0,stun:false}};
   mode='battle';renderSeeds();renderStatus();
   await fadeTo(0,160);
   await log(rare?`ร่างหายาก! ${e.name}โผล่ออกมาจากดิน!`:`${e.name}โผล่ออกมาจากดิน!`,800);
+  if(trans)await log('มันดูดพลังอุกกาบาตจนก้าวข้ามจุดอ่อนเดิม! ต้องหาจุดอ่อนใหม่',1100);
   let res=null;
   if(spdOf()>e.spd){
-    setMsg(`เราเร็วกว่า (ความเร็ว ${spdOf()} ต่อ ${e.spd}) จะสู้หรือถอยไปก่อน? ถอยแล้วไม่เสียอะไร และกลับมาสู้ตัวเดิมได้`);
+    setMsg(`ความเสี่ยง: ${riskOf(e).name} (พลังรวม ${playerCP()} ต่อ ${foeCP(e)}) เราเร็วกว่า ถอยได้โดยไม่เสียอะไร และกลับมาสู้ตัวเดิมได้`);
     if(!await choose([{label:'สู้เลย',value:1},{label:'ถอยไปก่อน',value:0}]))res='retreat';
   }else await log(`เราไม่เร็วกว่ามัน (ความเร็ว ${spdOf()} ต่อ ${e.spd}) ถอยไม่ได้ ต้องสู้!`,1000);
   if(!res)outer:for(;;){
@@ -184,7 +197,7 @@ async function victory(e){
   sfx.win();
   G.gold+=e.gold;
   G.seen[e.kind][e.rare?'rare':'n']++;
-  const shards=e.rare?2:Math.random()<.25?1:0;G.shards+=shards;
+  const shards=(e.rare?2:Math.random()<.25?1:0)+(e.trans?1:0);G.shards+=shards;
   const up=gainXP(e.xp);renderStatus();
   await say(`ชนะแล้ว! ได้ ${e.xp} EXP และ ${e.gold} G${shards?` และเศษอุกกาบาต ${shards} ชิ้น`:''}`);
   if(up){

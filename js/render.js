@@ -56,6 +56,7 @@ function renderBattle(dt){
     const bw=64,by=e.py+h/2+5|0,bx=e.px-bw/2|0;
     c.fillStyle='#120b06';c.fillRect(bx-1,by-1,bw+2,6);
     c.fillStyle=e.hp/e.maxhp<.3?'#ff8a70':'#7fd483';c.fillRect(bx,by,Math.ceil(bw*e.hp/e.maxhp),4);
+    if(e.trans&&!CALM){c.fillStyle='#c4a8f5';for(let i=0;i<6;i++){const a=-time*1.5+i*1.05;c.fillRect(e.px+Math.cos(a)*50|0,e.py+Math.sin(a)*40|0,3,3)}}
     if(e.rare&&!CALM){c.fillStyle='#fff6c9';for(let i=0;i<4;i++){const a=time*2+i*1.6;c.fillRect(e.px+Math.cos(a)*42|0,e.py+Math.sin(a*1.3)*34|0,2,2)}}
   }
   const p=pos('p'),x=p.x-24-(bt.plunge>0?14:0),y=p.y-24;

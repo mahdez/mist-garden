@@ -90,7 +90,7 @@ function rollYield(kind){
 }
 function harvest(p,x,y){
   const s=G.plots[p.i],kind=s.c;
-  if(s.mutant)return script(()=>encounter(p,kind,s.mutant==='rare',x,y));
+  if(s.mutant)return script(()=>encounter(p,kind,s.mutant==='rare',x,y,!!s.trans));
   const safe=G.harvests<2;
   const chance=safe?0:Math.min(.45,.10+.015*(mist()-1)+G.pity*.015);
   G.harvests++;
@@ -108,7 +108,8 @@ function harvest(p,x,y){
   note(`${bumper?'ผลดก! ':''}เก็บ${CROPS[kind].name}ได้ ${n} ${unit} รวมในกระเป๋า ${G.veg[kind]} ${unit}`);
   gainXP(1,true);renderStatus();mapHint();saveSoon();
 }
-async function encounter(p,kind,rare,x,y){
+async function encounter(p,kind,rare,x,y,trans){
+  if(trans===undefined)trans=Math.random()<transcendChance();
   inFight=true;
   showPad(false);
   sfx.enc();shake=4;
@@ -116,11 +117,11 @@ async function encounter(p,kind,rare,x,y){
   plotShake={i:p.i,t:.8};
   await wait(800);
   G.plots[p.i]={c:null,g:0,w:false};
-  const res=await battle(kind,rare);
+  const res=await battle(kind,rare,trans);
   inFight=false;
   if(res==='retreat'){
     // The revealed monster stays in this plot, unchanged, until the player comes back.
-    G.plots[p.i]={c:kind,g:CROPS[kind].days,w:false,mutant:rare?'rare':'normal'};
+    G.plots[p.i]={c:kind,g:CROPS[kind].days,w:false,mutant:rare?'rare':'normal',trans};
     note(`ถอยออกมาได้ มอนสเตอร์ยังรออยู่ในแปลง ${p.a+1},${p.b+1}`);saveSoon();return;
   }
   if(res==='win'||res==='boom'){saveSoon();return}
@@ -168,9 +169,11 @@ async function shop(){
     list.push({label:`ลับเครื่องมือ ขั้น ${G.sickle+1}`,sub:`โจมตี +2 · ${skCost} G${skS?` · เศษ ${skS}`:''}`,value:{up:'sickle',g:skCost,s:skS},disabled:G.gold<skCost||G.shards<skS});
     if(!G.can)list.push({label:'บัวรดน้ำใบใหญ่',sub:'รดน้ำ 3×3 · 250 G · เศษ 2',value:{up:'can',g:250,s:2},disabled:G.gold<250||G.shards<2});
     if(G.land<2){const g=G.land?500:200;list.push({label:`ซื้อที่ดินเป็น ${5+G.land}×${5+G.land}`,sub:`${g} G`,value:{up:'land',g,s:0},disabled:G.gold<g})}
+    for(const[id,t]of Object.entries(TOOLS))if(!G.tools[id])list.push({label:t.name,sub:`เครื่องมือต่อสู้ธาตุ${t.el} · ${t.price} G`,value:{tool:id,g:t.price},disabled:G.gold<t.price});
     const v=await choose(list,{cancel:true});
     if(!v)return;
-    if(v.seed){G.gold-=CROPS[v.seed].seed*v.n;G.seeds[v.seed]+=v.n}
+    if(v.tool){G.gold-=v.g;G.tools[v.tool]=1}
+    else if(v.seed){G.gold-=CROPS[v.seed].seed*v.n;G.seeds[v.seed]+=v.n}
     else{G.gold-=v.g;G.shards-=v.s;G[v.up]++}
     sfx.coin();renderStatus();saveSoon();
   }
@@ -268,7 +271,7 @@ async function allocMenu(){
 async function statsMenu(){
   for(;;){
   const sets=CROP_IDS.filter(k=>setCount(k)>=2).map(k=>`ชุด${CROPS[k].name} ${setCount(k)}/3`).join(', ')||'ยังไม่มี';
-  const rows=[['เลเวล',`${G.lv} (EXP ${G.xp}/${xpNext()})`],['HP',`${G.hp}/${maxHP()}`],['MP',`${G.pw}/${maxPW()}`],['SP',`${G.stam}/${maxStam()}`],
+  const rows=[['พลังรวม',playerCP()],['ระดับเกษตร',`${farmLevel()} (เครื่องมือแรง ${toolPower()})`],['เลเวล',`${G.lv} (EXP ${G.xp}/${xpNext()})`],['HP',`${G.hp}/${maxHP()}`],['MP',`${G.pw}/${maxPW()}`],['SP',`${G.stam}/${maxStam()}`],
     ['โจมตี',Math.round(atkOf())],['ป้องกัน',Math.round(defOf())],['ความเร็ว',spdOf()],
     ['คริติคอล',`${Math.round(critChance()*100)}%`],['โจมตีเบิ้ล',`${Math.round(doubleChance()*100)}%`],['หลบการโจมตี',`${Math.round(dodgeChance()*100)}%`],['ความแม่นยำ',`${Math.round(hitChance()*100)}%`],
     ...Object.values(PERKS).flat().filter(p=>G.stat[Object.keys(PERKS).find(k=>PERKS[k].includes(p))]>=p.at).map(p=>[p.name,p.note]),
@@ -312,6 +315,7 @@ async function bookMenu(){
     if(!k)return;
     const i=CROPS[k],m=MONSTERS[k],s=G.seen[k];
     await say(i.fact,CROPS[k].name);
+    await say(s.known?`แพ้${TOOLS[WEAKNESS[k].normal].el} เพราะ${WEAKNESS[k].reason}`:'ยังไม่รู้จุดอ่อน ลองใช้เครื่องมือต่าง ๆ ตอนสู้เพื่อค้นหา','จุดอ่อน');
     await say(`ในเกมขยายเกินจริงเป็นพลัง${i.power} ใส่ 2 ชิ้น: ${i.set2} · ใส่ 3 ชิ้น: ${i.set3}`,'พลังในเกม');
     await say(s.n||s.rare?`${m.name} ชนะแล้ว ${s.n} ครั้ง และร่างทอง ${s.rare} ครั้ง`:'ยังไม่เคยเอาชนะมอนสเตอร์จากผักชนิดนี้','บันทึกการต่อสู้');
   }
