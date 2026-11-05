@@ -29,7 +29,8 @@ function hurtPlayer(d,col){
     bt.dodged=true;sfx.miss();burst(pos('p').x,pos('p').y,'#d8f0ff',6);setMsg('หลบได้!');renderStatus();return 0;
   }
   d=Math.max(1,Math.round(d));
-  if(bt.reflect){bt.reflect=false;hurtEnemy(d*1.5,'#ffcf6b')}
+  if(bt.reflect){bt.reflect=false;hurtEnemy(d*bt.reflectMult,'#ffcf6b')}
+  d=Math.max(1,Math.round(d*[1,.9,.8][setTier('broccoli')]));
   if(bt.guard)d=Math.max(1,Math.round(d/2));
   G.hp=Math.max(0,G.hp-d);bt.pflash=.22;bt.shake=CALM?0:4;pop('p',d);const p=pos('p');burst(p.x,p.y,col||'#fff',10);renderStatus();return d;
 }
@@ -52,6 +53,8 @@ async function playerTurn(){
   const s=bt.status;bt.guard=false;bt.reflect=false;bt.active='p';renderStatus();
   const tomato=setCount('tomato');
   if(tomato>=2&&G.hp<maxHP()){const v=Math.min(tomato>=3?4:2,maxHP()-G.hp);G.hp+=v;pop('p','+'+v,'#7fd483');renderStatus();await wait(300)}
+  const cure=[0,.5,1][setTier('ginger')];
+  if(cure&&(s.poison>0||s.blind>0||s.stun)&&Math.random()<cure){s.poison=0;s.blind=0;s.stun=false;renderStatus();await log('ชุดขิงช่วยให้หายจากสถานะผิดปกติ',560)}
   if(s.poison>0){s.poison--;const d=Math.max(1,Math.round(maxHP()*.06));G.hp=Math.max(0,G.hp-d);bt.pflash=.22;pop('p',d,'#c98cff');renderStatus();await log('พิษเริ่มออกฤทธิ์',520);if(G.hp<=0)return}
   if(s.blind>0)s.blind--;
   if(s.stun){s.stun=false;renderStatus();await log('ยังมึนงงอยู่ ขยับไม่ได้',760);return}
@@ -63,6 +66,7 @@ async function playerTurn(){
       bt.plunge=.25;const r=playerAttack(1);
       if(r.miss){sfx.miss();await log('ตีพลาด!',620);break}
       r.crit?sfx.crit():sfx.hit();setMsg(r.crit?'คริติคอล! โดนจุดสำคัญเต็ม ๆ':`โจมตี${bt.e.name}`);hurtEnemy(r.d);await wait(620);
+      if(bt.e.hp>0&&Math.random()<[0,.2,.4][setTier('garlic')]){bt.e.status.poison=3;renderStatus();await log(`ชุดกระเทียมทำให้${bt.e.name}ติดพิษ!`,560)}
       if(bt.e.hp>0&&Math.random()<doubleChance()){
         bt.plunge=.25;const r2=playerAttack(1);
         if(r2.miss){sfx.miss();await log('โจมตีเบิ้ล แต่พลาด!',560)}
@@ -101,13 +105,24 @@ async function playerTurn(){
       }
       if(sk==='power'){
         const f=FRUITS[G.power];G[f.res]-=f.cost;renderStatus();
-        if(G.power==='pumpkin'){bt.guard=true;bt.reflect=true;sfx.ok();renderStatus();await log(`${f.skill}! รับความเสียหายครึ่งเดียว และสะท้อนการโจมตีครั้งถัดไป`,760);break}
+        if(f.type==='reflect'){bt.guard=true;bt.reflect=true;bt.reflectMult=f.reflect||1.5;sfx.ok();renderStatus();await log(`${f.skill}! รับความเสียหายครึ่งเดียว และสะท้อนการโจมตีครั้งถัดไป`,760);break}
+        if(f.type==='cure'){
+          const v=Math.min(Math.round(maxHP()*f.heal),maxHP()-G.hp);G.hp+=v;bt.status.poison=0;bt.status.blind=0;bt.status.stun=false;sfx.heal();pop('p','+'+v,'#7fd483');renderStatus();
+          await log(`${f.skill}! ฟื้น HP ${v} และสถานะผิดปกติหายไป`,700);break;
+        }
         bt.plunge=.25;sfx.crit();
-        if(G.power==='carrot'){setMsg(`${f.skill}! เล็งเข้าจุดสำคัญ`);hurtEnemy(playerAttack(1.4,true).d,'#ffcf6b');await wait(640);break}
-        const r=playerAttack(3);
+        if(f.type==='crit'){setMsg(`${f.skill}! เล็งเข้าจุดสำคัญ`);hurtEnemy(playerAttack(f.mult,true).d,'#ffcf6b');await wait(640);break}
+        const r=playerAttack(f.mult);
         if(r.miss){await log(`${f.skill}พลาด!`,620);break}
-        setMsg(`${f.skill}! ระเบิดใส่เต็ม ๆ แต่ตัวเองก็เจ็บ`);hurtEnemy(r.d,'#ff8a70');
-        G.hp=Math.max(1,G.hp-Math.round(maxHP()*.1));bt.pflash=.22;renderStatus();await wait(700);break;
+        setMsg(`${f.skill}!`);const dealt=hurtEnemy(r.d,'#ff8a70');
+        if(f.type==='blast'){G.hp=Math.max(1,G.hp-Math.round(maxHP()*.1));bt.pflash=.22;setMsg(`${f.skill}! ระเบิดใส่เต็ม ๆ แต่ตัวเองก็เจ็บ`)}
+        if(f.type==='drain'){const v=Math.min(Math.round(dealt*f.drain),maxHP()-G.hp);G.hp+=v;pop('p','+'+v,'#7fd483');setMsg(`${f.skill}! ดูด HP กลับมา ${v}`)}
+        renderStatus();await wait(620);
+        if(f.type==='statusHit'&&bt.e.hp>0){
+          if(Math.random()<f.chance){bt.e.status[f.status]=f.status==='stun'?true:f.turns;renderStatus();await log(`${bt.e.name}${FOE_STATUS_TEXT[f.status]}!`,620)}
+          else await log(`${bt.e.name}ต้านไว้ได้`,520);
+        }
+        break;
       }
       if(sk==='slash'){
         G.stam-=3;renderStatus();bt.plunge=.25;const r=playerAttack(1.8);
@@ -145,18 +160,30 @@ async function enemyTurn(){
     if(e.turns>=3||e.hp<e.maxhp*.5){e.charging=true;sfx.enc();await log(`${e.name}บวมเป่ง! ฆ่ามันให้ทันในเทิร์นนี้ หรือสั่งป้องกัน`,1200);bt.active=null;return}
     if(Math.random()<.35){setMsg(`${e.name}พ่นน้ำเปรี้ยว!`);sfx.hit();bt.elunge=.25;hurtPlayer(hit(.6),'#c98cff');const ok=tryStatus('poison',3);await log(ok?'ติดพิษ 3 เทิร์น!':resistText(),720);bt.active=null;return}
   }
-  if(e.kind==='carrot'){
-    const r=Math.random();
-    if(r<.3){setMsg(`${e.name}ทิ่มรัว 2 ครั้ง!`);bt.elunge=.25;sfx.hit();hurtPlayer(hit(.6));await wait(260);sfx.hit();bt.elunge=.25;hurtPlayer(hit(.6));await wait(520);bt.active=null;return}
-    if(r<.5){setMsg(`${e.name}สะบัดดินใส่หน้า!`);bt.elunge=.25;hurtPlayer(hit(.4));const ok=tryStatus('blind',3);await log(ok?'ตาพร่า ตีพลาดง่ายขึ้น 3 เทิร์น!':resistText(),760);bt.active=null;return}
+  const ai=MONSTERS[e.kind].ai||{};
+  if(ai.regen&&e.hp<e.maxhp){
+    const v=Math.min(Math.round(e.maxhp*ai.regen),e.maxhp-e.hp);e.hp+=v;pop('e','+'+v,'#7fd483');renderStatus();
+    await log(`${e.name}งอกใหม่ ฟื้น HP ${v}`,560);
   }
-  if(e.kind==='pumpkin'){
+  if(ai.charge){
     if(e.charging){
-      e.charging=false;setMsg(`${e.name}ทุบลงมาเต็มแรง!`);sfx.crit();bt.elunge=.3;hurtPlayer(hit(1.6));
-      if(!bt.guard&&G.hp>0){const ok=tryStatus('stun',true);await log(ok?'มึนงง เสียเทิร์นถัดไป!':resistText(),800)}else await wait(760);
+      e.charging=false;setMsg(`${e.name}${ai.charge.slam}`);sfx.crit();bt.elunge=.3;hurtPlayer(hit(ai.charge.mult));
+      if(ai.charge.stun&&!bt.guard&&G.hp>0){const ok=tryStatus('stun',true);await log(ok?'มึนงง เสียเทิร์นถัดไป!':resistText(),800)}else await wait(760);
       bt.active=null;return;
     }
-    if(e.turns%3===0){e.charging=true;sfx.enc();await log(`${e.name}ง้างตัวขึ้นสูง! เทิร์นหน้าควรสั่งป้องกัน`,1200);bt.active=null;return}
+    if(e.turns%3===0){e.charging=true;sfx.enc();await log(`${e.name}${ai.charge.warn}`,1200);bt.active=null;return}
+  }
+  let roll=Math.random();
+  if(ai.double){
+    if(roll<ai.double.chance){setMsg(`${e.name}${ai.double.text}`);bt.elunge=.25;sfx.hit();hurtPlayer(hit(.6));await wait(260);sfx.hit();bt.elunge=.25;hurtPlayer(hit(.6));await wait(520);bt.active=null;return}
+    roll-=ai.double.chance;
+  }
+  if(ai.blind){
+    if(roll<ai.blind.chance){setMsg(`${e.name}${ai.blind.text}`);bt.elunge=.25;hurtPlayer(hit(.4));const ok=tryStatus('blind',3);await log(ok?'ตาพร่า ตีพลาดง่ายขึ้น 3 เทิร์น!':resistText(),760);bt.active=null;return}
+    roll-=ai.blind.chance;
+  }
+  if(ai.poison&&roll<ai.poison.chance){
+    setMsg(`${e.name}${ai.poison.text}`);sfx.hit();bt.elunge=.25;hurtPlayer(hit(.6),'#c98cff');const ok=tryStatus('poison',3);await log(ok?'ติดพิษ 3 เทิร์น!':resistText(),720);bt.active=null;return;
   }
   bt.elunge=.25;sfx.hit();setMsg(`${e.name}โจมตี${bt.guard?' แต่กันไว้ได้':''}`);hurtPlayer(hit());await wait(620);bt.active=null;
 }
@@ -164,7 +191,7 @@ async function battle(kind,rare,trans=false){
   const L=mist(),m=MONSTERS[kind],sc=(1+.15*(L-1))*(rare?1.5:1)*(trans?TRANSCEND_POWER:1);
   await fadeTo(1,160);
   const e={kind,rare,trans,known:false,weak:WEAKNESS[kind][trans?'transcended':'normal'],name:(rare?`${CROPS[kind].name}ทองคำ`:m.name)+(trans?' ก้าวข้าม':''),maxhp:Math.round(m.hp*sc),hp:Math.round(m.hp*sc),atk:m.atk*sc,def:m.def*sc,spd:m.spd,xp:Math.round(m.xp*sc*(rare?2:1)),gold:Math.round(m.gold*sc*(rare?2:1)),px:92,py:122,turns:0,charging:false,status:{blind:0,poison:0,stun:false}};
-  bt={e,fx:[],floats:[],round:1,active:null,shake:0,eflash:0,pflash:0,elunge:0,plunge:0,boom:false,guard:false,reflect:false,status:{poison:0,blind:0,stun:false}};
+  bt={e,fx:[],floats:[],round:1,active:null,shake:0,eflash:0,pflash:0,elunge:0,plunge:0,boom:false,guard:false,reflect:false,reflectMult:1.5,status:{poison:0,blind:0,stun:false}};
   mode='battle';renderSeeds();renderStatus();
   await fadeTo(0,160);
   await log(rare?`ร่างหายาก! ${e.name}โผล่ออกมาจากดิน!`:`${e.name}โผล่ออกมาจากดิน!`,800);

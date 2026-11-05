@@ -5,7 +5,7 @@ async function titleScreen(){
   setMsg('เลือกเมนูเพื่อเริ่มเล่น');
   $('#hint').textContent='คีย์บอร์ด: ลูกศรเลื่อน · Enter เลือก · X กลับ';
   let s,v;
-  const enter=g=>{setOver('');g.fruits={carrot:0,tomato:0,pumpkin:0,...g.fruits};g.power=g.power||null;const upgraded=normalizeSave(g);G=g;const removed=removeUnmetGear();Object.assign(P,{x:g.x,y:g.y,fx:g.x,fy:g.y,path:null,moving:false});save();renderStatus();mode='map';renderSeeds();showPad(true);note(removed.length?`ถอด ${removed.join(', ')} เพราะสถานะยังไม่ถึง ลงแต้มแล้วใส่ใหม่ได้`:upgraded?`อัปเดตใหม่! ได้แต้มสถานะ ${g.points} แต้ม อัปได้ที่ เมนู → สถานะ`:'กลับมาที่ฟาร์มแล้ว');mapHint()};
+  const enter=g=>{setOver('');const upgraded=normalizeSave(g);G=g;const removed=removeUnmetGear();Object.assign(P,{x:g.x,y:g.y,fx:g.x,fy:g.y,path:null,moving:false});save();renderStatus();mode='map';renderSeeds();showPad(true);note(removed.length?`ถอด ${removed.join(', ')} เพราะสถานะยังไม่ถึง ลงแต้มแล้วใส่ใหม่ได้`:upgraded?`อัปเดตใหม่! ได้แต้มสถานะ ${g.points} แต้ม อัปได้ที่ เมนู → สถานะ`:'กลับมาที่ฟาร์มแล้ว');mapHint()};
   for(;;){
     s=loadSave();
     setMsg('เลือกเมนูเพื่อเริ่มเล่น');

@@ -41,7 +41,7 @@ function renderSeeds(){
   const box=$('#seeds');
   if(!G||mode!=='map'){box.innerHTML='';return}
   box.innerHTML='';
-  CROP_IDS.forEach(k=>{const b=document.createElement('button');b.type='button';b.textContent=`เมล็ด${CROPS[k].name} ${G.seeds[k]}`;
+  unlockedCrops().forEach(k=>{const b=document.createElement('button');b.type='button';b.textContent=`เมล็ด${CROPS[k].name} ${G.seeds[k]}`;
     if(G.sel===k)b.className='on';b.addEventListener('click',()=>{G.sel=k;sfx.move();renderSeeds();cv.focus({preventScroll:true})});box.appendChild(b)});
 }
 function setMsg(t,who=''){$('#msg').textContent=t;$('#who').textContent=who;$('#hint').textContent=''}

@@ -4,8 +4,8 @@ const KEY={ArrowUp:'up',ArrowDown:'down',ArrowLeft:'left',ArrowRight:'right',w:'
 function doFacing(){if(mode!=='map'||P.moving)return;const[x,y]=facing();act(x,y)}
 addEventListener('keydown',e=>{
   if(e.target.matches&&e.target.matches('textarea,input')&&e.key!=='Escape')return;
-  const d=KEY[e.key],ok=e.key==='Enter'||e.key===' '||e.key==='z'||e.key==='Z',no=e.key==='Escape'||e.key==='x'||e.key==='X',num=['1','2','3'].indexOf(e.key);
-  if(num>=0&&mode==='map'&&G){G.sel=CROP_IDS[num];sfx.move();renderSeeds();mapHint();return}
+  const d=KEY[e.key],ok=e.key==='Enter'||e.key===' '||e.key==='z'||e.key==='Z',no=e.key==='Escape'||e.key==='x'||e.key==='X',num=['1','2','3','4','5','6','7','8','9'].indexOf(e.key);
+  if(num>=0&&mode==='map'&&G){const k=unlockedCrops()[num];if(k){G.sel=k;sfx.move();renderSeeds();mapHint()}return}
   if(!(d||ok||no))return;
   if(e.target.closest&&e.target.closest('#foot,#seeds')&&ok)return;
   e.preventDefault();

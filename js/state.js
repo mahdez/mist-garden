@@ -2,11 +2,12 @@
 let G=null,mode='title',fade=0,time=0,shake=0;
 const P={x:4,y:5,fx:4,fy:5,dir:'down',moving:false,t:0,path:null,then:null};
 let fxMap=[],floatsMap=[];
+const perCrop=v=>Object.fromEntries(CROP_IDS.map(k=>[k,typeof v==='function'?v():v]));
 function newGame(){
   const plots=[];for(let i=0;i<36;i++)plots.push({c:null,g:0,w:false});
-  return {day:1,gold:40,shards:0,lv:1,xp:0,hp:40,pw:10,seeds:{carrot:6,tomato:0,pumpkin:0},veg:{carrot:0,tomato:0,pumpkin:0},
-    stat:{hp:0,pw:0,atk:0,def:0,spd:0,sta:0},golden:0,points:0,stam:30,items:{},equip:{weapon:null,hat:null,shirt:null},fruits:{carrot:0,tomato:0,pumpkin:0},power:null,tools:{water:1},plots,land:0,sickle:0,can:0,harvests:0,pity:0,sel:'carrot',
-    seen:{carrot:{n:0,rare:0},tomato:{n:0,rare:0},pumpkin:{n:0,rare:0}},x:4,y:5};
+  return {day:1,gold:40,shards:0,lv:1,xp:0,hp:40,pw:10,seeds:{...perCrop(0),carrot:6},veg:perCrop(0),
+    stat:{hp:0,pw:0,atk:0,def:0,spd:0,sta:0},golden:0,points:0,stam:30,items:{},equip:{weapon:null,hat:null,shirt:null},fruits:perCrop(0),power:null,tools:{water:1},plots,land:0,sickle:0,can:0,harvests:0,pity:0,sel:'carrot',
+    seen:perCrop(()=>({n:0,rare:0})),x:4,y:5};
 }
 const SAVE='mist-garden-save-v1';
 function save(){try{localStorage.setItem(SAVE,JSON.stringify({...G,x:P.x,y:P.y}))}catch(e){}}
@@ -43,7 +44,7 @@ function setCount(crop){return SLOTS.filter(s=>G.equip[s]&&itemCrop(G.equip[s])=
 // Food always heals at least the weakest monster's current attack + 5, so eating stays worth a turn as mist rises.
 const HEAL_BONUS=5;
 const lowestAtk=()=>Math.min(...Object.values(MONSTERS).map(m=>m.atk))*(1+.15*(mist()-1));
-const eatHeal=k=>Math.round(Math.max(CROPS[k].eat,Math.round(lowestAtk())+HEAL_BONUS)*(perkTier('hp')>=2?1.5:1));
+const eatHeal=k=>Math.round((CROPS[k].noFloor?CROPS[k].eat:Math.max(CROPS[k].eat,Math.round(lowestAtk())+HEAL_BONUS))*(perkTier('hp')>=2?1.5:1));
 const perkTier=k=>PERKS[k].filter(p=>(G.stat&&G.stat[k]||0)>=p.at).length;
 const statPts=k=>(G.stat&&G.stat[k]||0)*STATS[k].per;
 const gearExtra=k=>SLOTS.reduce((sum,s)=>{const id=G.equip[s];return sum+(id&&GEAR[itemCrop(id)][s][2][k]||0)},0);
@@ -65,10 +66,12 @@ function removeUnmetGear(){
   for(const s of SLOTS){const id=G.equip[s];if(id&&!meetsReq(id)){off.push(itemName(id));G.equip[s]=null}}
   return off;
 }
-const maxHP=()=>40+(G.lv-1)*4+gearBonus('hat')+gearExtra('hp')+statPts('hp');
+const setTier=k=>{const n=setCount(k);return n>=3?2:n>=2?1:0};
+const unlockedCrops=()=>CROP_IDS.filter(k=>(CROPS[k].unlock||1)<=mist());
+const maxHP=()=>Math.round((40+(G.lv-1)*4+gearBonus('hat')+gearExtra('hp')+statPts('hp'))*[1,1.15,1.3][setTier('spinach')]);
 const maxPW=()=>10+(G.lv-1)+gearExtra('pw')+statPts('pw');
-const maxStam=()=>30+(G.lv-1)*2+gearExtra('sta')+statPts('sta');
-const atkOf=()=>6+(G.lv-1)*.5+G.sickle*2+gearBonus('weapon')+gearExtra('atk')+statPts('atk');
+const maxStam=()=>30+(G.lv-1)*2+gearExtra('sta')+statPts('sta')+[0,15,30][setTier('sweetpotato')];
+const atkOf=()=>(6+(G.lv-1)*.5+G.sickle*2+gearBonus('weapon')+gearExtra('atk')+statPts('atk'))*[1,1.1,1.2][setTier('chili')];
 const defOf=()=>3+gearBonus('shirt')+gearExtra('def')+statPts('def');
 const spdOf=()=>6+(G.lv-1)*.25+gearExtra('spd')+statPts('spd');
 const doubleChance=()=>Math.min(.45,(G.stat&&G.stat.spd||0)*SPD_DOUBLE_PER_POINT);
@@ -82,6 +85,8 @@ function normalizeSave(g){
   if(upgraded)g.points=(g.lv-1)*POINTS_PER_LEVEL;
   if(g.stam===undefined)g.stam=30+(g.lv-1)*2;
   g.golden=g.golden||0;
+  g.seeds={...perCrop(0),...g.seeds};g.veg={...perCrop(0),...g.veg};g.fruits={...perCrop(0),...g.fruits};g.seen={...perCrop(()=>({n:0,rare:0})),...g.seen};
+  g.power=g.power||null;
   g.tools={water:1,...g.tools};
   return upgraded;
 }

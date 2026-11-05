@@ -38,6 +38,12 @@ function cropArt(kind,stage){
     }
     if(kind==='carrot'){P(4,1,2,6,leaf);P(7,0,2,7,dark);P(10,1,2,6,leaf);P(4,6,8,3,'#f28a2c');P(5,9,6,3,'#e87d22');P(6,12,4,2,'#c9651a');P(5,7,2,1,'#ffb45e')}
     if(kind==='tomato'){P(7,1,2,13,dark);P(3,3,10,2,leaf);P(3,8,10,2,leaf);[[3,5],[10,4],[9,10],[3,11]].forEach(([x,y])=>{P(x,y,4,4,'#d9413f');P(x+1,y,1,1,'#ff8a7a')})}
+    if(kind==='spinach'){P(7,6,2,8,dark);P(2,3,5,4,leaf);P(9,2,5,5,leaf);P(4,8,3,3,dark);P(9,8,4,3,leaf);P(3,4,2,1,'#7fd483')}
+    if(kind==='chili'){P(7,1,2,12,dark);P(3,3,10,2,leaf);[[3,5],[6,7],[10,5],[12,8]].forEach(([x,y])=>{P(x,y,2,5,'#d9302c');P(x,y,1,1,'#3fa34d')})}
+    if(kind==='garlic'){P(6,0,1,7,leaf);P(9,1,1,6,leaf);P(4,7,8,6,'#f4efe2');P(3,9,10,3,'#f4efe2');P(7,7,1,6,'#b9a9c9');P(5,13,6,1,'#b9a9c9')}
+    if(kind==='sweetpotato'){P(3,2,4,3,leaf);P(9,2,4,3,dark);P(7,3,2,5,dark);P(3,8,10,5,'#8a4a8f');P(5,7,6,7,'#8a4a8f');P(5,9,2,1,'#c08ac6')}
+    if(kind==='ginger'){P(6,0,1,6,leaf);P(9,1,1,5,dark);P(3,6,10,6,'#c9a35a');P(1,8,3,3,'#c9a35a');P(12,9,3,3,'#c9a35a');P(5,12,4,2,'#a07f3e');P(5,7,2,1,'#e6cf94')}
+    if(kind==='broccoli'){P(7,9,2,5,'#7fbf6a');P(3,3,10,6,'#2f8f46');P(2,5,12,3,'#2f8f46');P(5,1,6,3,'#2f8f46');P(4,4,2,1,'#7fd483');P(9,2,2,1,'#7fd483');P(11,6,2,1,'#7fd483')}
     if(kind==='pumpkin'){P(7,1,2,4,dark);P(3,2,5,2,leaf);P(2,5,12,9,'#e88a2a');P(1,7,14,5,'#e88a2a');for(const x of[4,7,10])P(x,5,1,9,'#b5621a');P(3,6,2,1,'#ffb45e')}
   });
 }
@@ -69,11 +75,13 @@ function charSprite(l,dir,step){
   if(l.hat==='carrot'){P(4,2,8,2,'#f28a2c');P(3,3,10,1,'#c9651a');P(4,0,2,2,'#4fae56');P(7,0,2,2,'#2f7f3e');P(10,0,2,2,'#4fae56')}
   if(l.hat==='tomato'){P(3,1,10,3,'#d9413f');P(4,1,2,1,'#ff8a7a');P(5,0,6,2,'#3fa34d')}
   if(l.hat==='pumpkin'){P(2,0,12,5,'#e88a2a');for(const x of[5,8,11])P(x,0,1,5,'#b5621a');P(7,0,2,1,'#3f8a3a')}
+  if(l.hat&&GEAR[l.hat].art){const a=GEAR[l.hat].art;P(3,1,10,3,a.hat);P(5,0,6,1,a.hat2);P(4,1,2,1,a.hat2)}
   if(d==='left'){
     if(!l.weapon){P(1,4,1,10,'#9c6b3a');P(0,3,3,2,'#bfc6cf')}
     if(l.weapon==='carrot'){P(1,2,2,9,'#f28a2c');P(1,1,1,1,'#ffb45e');P(0,11,4,1,'#3fa34d');P(1,12,2,2,'#3fa34d')}
     if(l.weapon==='tomato'){P(1,6,1,8,'#9c6b3a');P(0,2,4,4,'#d9413f');P(1,2,2,1,'#3fa34d')}
     if(l.weapon==='pumpkin'){P(1,7,1,7,'#7a4a20');P(0,2,4,5,'#e88a2a');P(1,2,1,5,'#b5621a')}
+    if(l.weapon&&GEAR[l.weapon].art){P(1,7,1,7,'#7a4a20');P(0,2,3,5,GEAR[l.weapon].art.weapon)}
   }
   if(flip){const f=mk(T,T),h=f.getContext('2d');h.translate(T,0);h.scale(-1,1);h.drawImage(e,0,0);return charCache[key]=f}
   return charCache[key]=e;

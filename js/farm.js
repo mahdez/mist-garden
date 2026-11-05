@@ -25,7 +25,7 @@ function mapHint(){
   if(!G||mode!=='map')return;
   const[x,y]=facing(),d=describe(x,y);
   $('#who').textContent='';
-  $('#hint').textContent=d||'คลิกช่องบนจอเพื่อเดินไปทำงาน หรือใช้ลูกศร · Enter ทำงาน · 1-3 เลือกเมล็ด · X เมนู';
+  $('#hint').textContent=d||'คลิกช่องบนจอเพื่อเดินไปทำงาน หรือใช้ลูกศร · Enter ทำงาน · 1-9 เลือกเมล็ด · X เมนู';
 }
 function note(t){$('#msg').textContent=t}
 function burstMap(x,y,col,n=8){for(let i=0;i<(CALM?3:n);i++){const a=rand(0,TAU),s=rand(10,40);fxMap.push({x:x*T+8,y:y*T+8,vx:Math.cos(a)*s,vy:Math.sin(a)*s-16,life:rand(.25,.5),col})}}
@@ -151,7 +151,7 @@ async function nextDay(hpRatio=1){
   G.hp=Math.max(1,Math.round(maxHP()*hpRatio));G.pw=maxPW();G.stam=Math.round(maxStam()*hpRatio);
   save();pushBackup({...G,x:P.x,y:P.y});renderStatus();
   await fadeTo(0,300);
-  if(mist()>L0){await say(`หมอกหนาขึ้นเป็นระดับ ${mist()} ผักกลายพันธุ์ง่ายขึ้น และมอนสเตอร์ก็แรงขึ้น`)}
+  if(mist()>L0){const fresh=CROP_IDS.filter(k=>(CROPS[k].unlock||1)===mist()).map(k=>CROPS[k].name);await say(`หมอกหนาขึ้นเป็นระดับ ${mist()} ผักกลายพันธุ์ง่ายขึ้น และมอนสเตอร์ก็แรงขึ้น${fresh.length?` ร้านมีเมล็ด${fresh.join(' ')}ขายแล้ว`:''}`)}
 }
 async function sleep(){
   setMsg('เข้านอนเลยไหม? ผักที่รดน้ำแล้วจะโตขึ้นในวันพรุ่งนี้');
@@ -162,7 +162,7 @@ async function shop(){
   for(;;){
     setMsg('ร้านของชำริมทาง ซื้ออะไรดี?','เจ้าของร้าน');
     const list=[];
-    for(const k of CROP_IDS){const i=CROPS[k];
+    for(const k of unlockedCrops()){const i=CROPS[k];
       list.push({label:`เมล็ด${i.name} (มี ${G.seeds[k]})`,sub:`${i.seed} G · โต ${i.days} วัน · ขาย ${i.sell} G`,value:{seed:k,n:1},disabled:G.gold<i.seed});
       list.push({label:`เมล็ด${i.name} × 5`,sub:`${i.seed*5} G`,value:{seed:k,n:5},disabled:G.gold<i.seed*5});}
     const skCost=60*(G.sickle+1),skS=G.sickle;
@@ -182,7 +182,7 @@ async function sell(){
   for(;;){
     const total=CROP_IDS.reduce((a,k)=>a+G.veg[k]*CROPS[k].sell,0);
     setMsg(total?`ผักในกระเป๋าขายได้รวม ${total} G`:'ยังไม่มีผักให้ขาย ไปเก็บเกี่ยวก่อน');
-    const list=[{label:'ขายทั้งหมด',sub:`${total} G`,value:'all',disabled:!total},...CROP_IDS.map(k=>({label:`${CROPS[k].name} × ${G.veg[k]}`,sub:`ลูกละ ${CROPS[k].sell} G`,value:k,disabled:!G.veg[k]}))];
+    const list=[{label:'ขายทั้งหมด',sub:`${total} G`,value:'all',disabled:!total},...CROP_IDS.filter(k=>G.veg[k]>0).map(k=>({label:`${CROPS[k].name} × ${G.veg[k]}`,sub:`ลูกละ ${CROPS[k].sell} G`,value:k,disabled:!G.veg[k]}))];
     const v=await choose(list,{cancel:true});
     if(!v)return;
     if(v==='all'){G.gold+=total;CROP_IDS.forEach(k=>G.veg[k]=0)}else{G.gold+=CROPS[v].sell;G.veg[v]--}
@@ -311,7 +311,7 @@ async function gearMenu(){
 async function bookMenu(){
   for(;;){
     setMsg('สมุดผัก เลือกผักเพื่ออ่านข้อมูล');
-    const k=await choose(CROP_IDS.map(k=>{const s=G.seen[k],own=SLOTS.filter(o=>G.items[itemId(k,o)]).length;return{label:CROPS[k].name,sub:`ชนะ ${s.n} · ร่างทอง ${s.rare} · ของ ${own}/3`,value:k}}),{cancel:true});
+    const k=await choose(unlockedCrops().map(k=>{const s=G.seen[k],own=SLOTS.filter(o=>G.items[itemId(k,o)]).length;return{label:CROPS[k].name,sub:`ชนะ ${s.n} · ร่างทอง ${s.rare} · ของ ${own}/3`,value:k}}),{cancel:true});
     if(!k)return;
     const i=CROPS[k],m=MONSTERS[k],s=G.seen[k];
     await say(i.fact,CROPS[k].name);
