@@ -94,7 +94,7 @@ async function playerTurn(){
       const t=TOOLS[k],e=bt.e,isWeak=e.weak===k,oldWeak=e.trans&&WEAKNESS[e.kind].normal===k;
       G.stam-=t.cost;bt.plunge=.25;isWeak?sfx.crit():sfx.hit();
       hurtEnemy(toolPower()*(isWeak?TOOL_WEAK:oldWeak?TOOL_OLD_WEAK:1),t.col);burst(e.px,e.py,t.col,18);
-      if(isWeak){e.known=true;if(!e.trans&&G.seen[e.kind])G.seen[e.kind].known=1}
+      if(isWeak){e.known=true;if(!e.trans){G.seen[e.kind]=G.seen[e.kind]||{n:0,rare:0};G.seen[e.kind].known=1}}
       renderStatus();
       await log(isWeak?`${t.act}${e.name}! โดนจุดอ่อน${t.el} แรงขึ้นมาก`:oldWeak?`${e.name}ไม่กลัว${t.el}อีกแล้ว แทบไม่สะดุ้ง`:`${t.act}${e.name}`,760);
       break;
@@ -204,7 +204,7 @@ async function enemyTurn(e){
 }
 function makeFoe(spec,slot,total){
   const{kind,rare,trans}=spec,L=mist(),m=MONSTERS[kind],sc=(1+.15*(L-1))*(rare?1.5:1)*(trans?TRANSCEND_POWER:1);
-  return {kind,rare,trans,boss:!!m.boss,known:false,weak:WEAKNESS[kind][trans?'transcended':'normal'],name:(rare?`${CROPS[kind].name}ทองคำ`:m.name)+(trans?' ก้าวข้าม':''),maxhp:Math.round(m.hp*sc),hp:Math.round(m.hp*sc),atk:m.atk*sc,def:m.def*sc,spd:m.spd,xp:Math.round(m.xp*sc*(rare?2:1)),gold:Math.round(m.gold*sc*(rare?2:1)),slot,px:FOE_SLOTS[total][slot][0],py:FOE_SLOTS[total][slot][1],turns:0,charging:false,boomed:false,status:{blind:0,poison:0,stun:false}};
+  return {kind,rare,trans,boss:!!m.boss,known:false,weak:WEAKNESS[kind][trans?'transcended':'normal'],name:(rare?`${(CROPS[kind]||FISH[kind]).name}ทองคำ`:m.name)+(trans?' ก้าวข้าม':''),maxhp:Math.round(m.hp*sc),hp:Math.round(m.hp*sc),atk:m.atk*sc,def:m.def*sc,spd:m.spd,xp:Math.round(m.xp*sc*(rare?2:1)),gold:Math.round(m.gold*sc*(rare?2:1)),slot,px:FOE_SLOTS[total][slot][0],py:FOE_SLOTS[total][slot][1],turns:0,charging:false,boomed:false,status:{blind:0,poison:0,stun:false}};
 }
 // Accepts one monster (kind, rare, trans) or a list of {kind, rare, trans}. At most MAX_FOES fight at once; the rest step in as others fall.
 async function battle(kind,rare,trans=false){
@@ -270,6 +270,7 @@ async function victory(list){
   let xp=0,gold=0,shards=0;
   for(const e of list){
     xp+=e.xp;gold+=e.gold;
+    G.seen[e.kind]=G.seen[e.kind]||{n:0,rare:0};
     G.seen[e.kind][e.rare?'rare':'n']++;
     shards+=(e.rare?2:Math.random()<.25?1:0)+(e.trans?1:0);
   }
@@ -283,6 +284,12 @@ async function victory(list){
   for(const e of list)await foeDrops(e);
 }
 async function foeDrops(e){
+  if(MONSTERS[e.kind].fish){
+    G.fish[e.kind]++;if(e.rare)G.goldFish++;
+    await say(`ได้${FISH[e.kind].name} 1 ตัว${e.rare?' และปลาทอง 1 ตัว':''} จากการปราบมอนปลา`,'ของดรอป');
+    if(Math.random()<GOLDEN_VEG.drop){G.golden++;await say(`ได้รับ ${GOLDEN_VEG.name}! กินแล้วฟื้น HP MP SP เต็ม เก็บไว้ในเมนูกินผัก`,'ของดรอป')}
+    return;
+  }
   if(Math.random()<(e.rare?GOLDEN_VEG.rareDrop:GOLDEN_VEG.drop)){
     G.golden++;
     await say(`ได้รับ ${GOLDEN_VEG.name}! กินแล้วฟื้น HP MP SP เต็ม เก็บไว้ในเมนูกินผัก`,'ของดรอป');

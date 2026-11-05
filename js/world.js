@@ -138,27 +138,64 @@ async function reforgeMenu(){
 /* ---------- Fish pond ---------- */
 const unlockedFish=()=>Object.keys(FISH).filter(k=>FISH[k].unlock<=mist());
 const fishName=k=>k==='gold'?'ปลาทอง':FISH[k].name;
-function growPond(){for(const f of G.pond){if(f.fed&&f.age<FISH[f.k].days)f.age++;f.fed=false}}
+function growPond(){for(const f of G.pond){if(!f.mutant&&f.fed&&f.age<FISH[f.k].days)f.age++;f.fed=false}}
+function fishMutates(){
+  const c=FISH_MUTATION,safe=G.fishCaught<c.safeCatches;
+  G.fishCaught++;
+  return !safe&&Math.random()<Math.min(c.max,c.base+c.perMist*(mist()-1));
+}
+// Caught fish that mutated fight together. Retreating leaves them in the pond; losing lets them eat other fish.
+async function fishEncounter(list){
+  for(const m of list)if(m.trans===undefined)m.trans=Math.random()<transcendChance();
+  inFight=true;showPad(false);sfx.enc();shake=4;
+  setMsg(list.length>1?`น้ำในบ่อเดือดพล่าน ปลา ${list.length} ตัวกลายพันธุ์!`:`${FISH[list[0].k].name}ตัวนี้กลายพันธุ์!`,'บ่อปลา');
+  await wait(800);
+  for(const m of list){const i=G.pond.indexOf(m.fish);if(i>=0)G.pond.splice(i,1)}
+  const res=await battle(list.map(m=>({kind:m.k,rare:m.rare,trans:m.trans})));
+  inFight=false;
+  if(res==='retreat'){
+    for(const m of list)G.pond.push({k:m.k,age:FISH[m.k].days,fed:false,mutant:m.rare?'rare':'normal',trans:m.trans});
+    setMsg('ถอยออกมาได้ มอนปลายังรออยู่ในบ่อ');saveSoon();return;
+  }
+  if(res==='lose'){
+    const healthy=G.pond.filter(f=>!f.mutant).sort(()=>Math.random()-.5);
+    const gone=healthy.slice(0,[3,1,0][perkTier('def')]*list.length);
+    G.pond=G.pond.filter(f=>!gone.includes(f));
+    await say(gone.length?`มอนปลากินปลาตัวอื่นในบ่อไป ${gone.length} ตัว แล้วหายไปในหมอก เราสลบไปจนเช้า`:'มอนปลาหายไปในหมอก เราสลบไปจนเช้า');
+    await nextDay(perkTier('hp')>=1?1:.5);
+  }
+  saveSoon();
+}
 async function pondMenu(){
   for(;;){
-    const ready=G.pond.filter(f=>f.age>=FISH[f.k].days),hungry=G.pond.filter(f=>!f.fed&&f.age<FISH[f.k].days);
-    setMsg(`บ่อมีปลา ${G.pond.length}/${POND_SIZE} ตัว · หิว ${hungry.length} · จับได้ ${ready.length}`,'บ่อปลา');
+    const waiting=G.pond.filter(f=>f.mutant),ready=G.pond.filter(f=>!f.mutant&&f.age>=FISH[f.k].days),hungry=G.pond.filter(f=>!f.mutant&&!f.fed&&f.age<FISH[f.k].days);
+    setMsg(`บ่อมีปลา ${G.pond.length}/${POND_SIZE} ตัว · หิว ${hungry.length} · จับได้ ${ready.length}${waiting.length?` · มอนปลารออยู่ ${waiting.length}`:''}`,'บ่อปลา');
     const list=[
+      ...(waiting.length?[{label:'สู้มอนปลาที่รออยู่',sub:`${waiting.length} ตัว`,value:'fight'}]:[]),
       {label:'ให้อาหารทั้งบ่อ',sub:'SP 1 · ปลาโตเมื่อได้กิน',value:'feed',disabled:!hungry.length},
-      {label:'จับปลาที่โตแล้ว',sub:`SP ตัวละ 1 · มีโอกาสได้ปลาทอง`,value:'catch',disabled:!ready.length},
+      {label:'ตกด้วยคันเบ็ด',sub:'จับได้ 1 ตัว · SP 1',value:{rod:1},disabled:!ready.length},
+      ...(G.net?[(()=>{const n=NETS[G.net-1];return {label:`หว่าน${n.name}`,sub:`จับได้ ${n.min}-${n.max} ตัว · SP 1`,value:{net:1},disabled:!ready.length}})()]:[]),
       ...unlockedFish().map(k=>({label:`ปล่อย${FISH[k].name}`,sub:`${FISH[k].fry} G · โต ${FISH[k].days} วัน · ขาย ${FISH[k].sell} G`,value:{fry:k},disabled:G.gold<FISH[k].fry||G.pond.length>=POND_SIZE})),
     ];
     const v=await choose(list,{cancel:true});
     if(!v)return;
+    if(v==='fight'){
+      await fishEncounter(waiting.map(f=>({k:f.k,fish:f,rare:f.mutant==='rare',trans:!!f.trans})));
+      return;
+    }
     if(v==='feed'){if(useStamina(1)){hungry.forEach(f=>f.fed=true);sfx.water();setMsg('ให้อาหารแล้ว')}}
-    else if(v==='catch'){
-      let n=0,gold=0;
-      for(const f of ready){
-        if(!useStamina(1))break;
+    else if(v.rod||v.net){
+      if(!useStamina(1)){await wait(700);continue}
+      const net=v.net?NETS[G.net-1]:null,want=net?net.min+Math.floor(Math.random()*(net.max-net.min+1)):1;
+      const caught=[...ready].sort(()=>Math.random()-.5).slice(0,want);
+      let n=0,gold=0;const monsters=[];
+      for(const f of caught){
+        if(fishMutates()){monsters.push({k:f.k,fish:f,rare:Math.random()<FISH_MUTATION.rare});continue}
         G.pond.splice(G.pond.indexOf(f),1);n++;
         if(Math.random()<GOLD_FISH_CHANCE){G.goldFish++;gold++}else G.fish[f.k]++;
       }
-      if(n){sfx.harvest();await say(`จับปลาได้ ${n} ตัว${gold?` เป็นปลาทอง ${gold} ตัว!`:''}`)}
+      if(n){sfx.harvest();await say(`${net?`หว่าน${net.name}`:'ตกเบ็ด'} จับปลาได้ ${n} ตัว${gold?` เป็นปลาทอง ${gold} ตัว!`:''}`)}
+      if(monsters.length){await fishEncounter(monsters);return}
     }else{G.gold-=FISH[v.fry].fry;G.pond.push({k:v.fry,age:0,fed:false});sfx.plant()}
     renderStatus();saveSoon();
   }
@@ -167,6 +204,6 @@ function renderPondFish(){
   if(!G||!G.pond)return;
   G.pond.forEach((f,i)=>{
     const x=1*T+6+i*9+Math.sin(time+i)*4,y=12*T+7+(i%2)*12+Math.cos(time*.8+i)*2,done=f.age>=FISH[f.k].days;
-    c.fillStyle=done?'#ffcf6b':'#1f4f80';c.fillRect(x|0,y|0,done?5:4,2);c.fillRect((x+(done?5:4))|0,(y-1)|0,1,4);
+    c.fillStyle=f.mutant?(f.mutant==='rare'?'#ffd34a':'#c4a8f5'):done?'#ffcf6b':'#1f4f80';c.fillRect(x|0,y|0,done?5:4,2);c.fillRect((x+(done?5:4))|0,(y-1)|0,1,4);
   });
 }

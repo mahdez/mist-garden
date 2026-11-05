@@ -24,7 +24,7 @@ function describe(x,y){
   if(t==='b')return 'Enter: ขายผัก';
   if(t==='M')return 'Enter: ลงไปในหลุมอุกกาบาต';
   if(t==='o')return 'Enter: ดูบ่อน้ำ';
-  if(t==='~')return 'Enter: ดูแลบ่อปลา';
+  if(t==='~')return G.pond.some(f=>f.mutant)?'Enter: บ่อปลา มีมอนปลารออยู่':'Enter: ดูแลบ่อปลา';
   return null;
 }
 function mapHint(){
@@ -212,11 +212,13 @@ async function shop(){
     if(!G.can)list.push({label:'บัวรดน้ำใบใหญ่',sub:'รดน้ำ 3×3 · 250 G · เศษ 2',value:{up:'can',g:250,s:2},disabled:G.gold<250||G.shards<2});
     if(G.land<2){const g=G.land?500:200;list.push({label:`ซื้อที่ดินเป็น ${5+G.land}×${5+G.land}`,sub:`${g} G`,value:{up:'land',g,s:0},disabled:G.gold<g})}
     for(const[id,t]of Object.entries(TOOLS))if(!G.tools[id])list.push({label:t.name,sub:`เครื่องมือต่อสู้ธาตุ${t.el} · ${t.price} G`,value:{tool:id,g:t.price},disabled:G.gold<t.price});
+    if(G.net<NETS.length){const n=NETS[G.net];list.push({label:n.name,sub:`จับปลา ${n.min}-${n.max} ตัวต่อครั้ง · ${n.gold} G${n.shards?` · เศษ ${n.shards}`:''}`,value:{buyNet:n},disabled:G.gold<n.gold||G.shards<n.shards})}
     if(spentPoints()>0)list.push({label:'ล้างแต้มสถานะ',sub:`เศษอุกกาบาต ${SHARD_COST.respec}`,value:{service:respecMenu},disabled:G.shards<SHARD_COST.respec});
     list.push({label:'หลอมอุปกรณ์',sub:`เพิ่ม 1 ขั้น · เศษอุกกาบาต ${SHARD_COST.reforge}`,value:{service:reforgeMenu},disabled:G.shards<SHARD_COST.reforge});
     const v=await choose(list,{cancel:true});
     if(!v)return;
     if(v.service){await v.service();continue}
+    if(v.buyNet){G.gold-=v.buyNet.gold;G.shards-=v.buyNet.shards;G.net++;sfx.coin();renderStatus();saveSoon();continue}
     if(v.tool){G.gold-=v.g;G.tools[v.tool]=1}
     else if(v.seed){G.gold-=CROPS[v.seed].seed*v.n;G.seeds[v.seed]+=v.n}
     else{G.gold-=v.g;G.shards-=v.s;G[v.up]++}
@@ -359,8 +361,14 @@ async function gearMenu(){
 async function bookMenu(){
   for(;;){
     setMsg('สมุดผัก เลือกผักเพื่ออ่านข้อมูล');
-    const k=await choose(unlockedCrops().map(k=>{const s=G.seen[k],own=SLOTS.filter(o=>G.items[itemId(k,o)]).length;return{label:CROPS[k].name,sub:`ชนะ ${s.n} · ร่างทอง ${s.rare} · ของ ${own}/3`,value:k}}),{cancel:true});
+    const k=await choose([...unlockedCrops().map(k=>{const s=G.seen[k],own=SLOTS.filter(o=>G.items[itemId(k,o)]).length;return{label:CROPS[k].name,sub:`ชนะ ${s.n} · ร่างทอง ${s.rare} · ของ ${own}/3`,value:k}}),...unlockedFish().map(f=>{const s=G.seen[f]||{n:0,rare:0};return{label:FISH[f].name,sub:`ชนะ ${s.n} · ร่างทอง ${s.rare}`,value:'fish:'+f}})],{cancel:true});
     if(!k)return;
+    if(k.startsWith('fish:')){
+      const f=k.slice(5),sf=G.seen[f]||{},w=WEAKNESS[f];
+      await say(`กินแล้วฟื้น HP ${FISH[f].hp} และ MP ${FISH[f].mp} ปล่อยเลี้ยง ${FISH[f].days} วัน ขายได้ ${FISH[f].sell} G`,FISH[f].name);
+      await say(sf.known?`แพ้${TOOLS[w.normal].el} เพราะ${w.reason}`:'ยังไม่รู้จุดอ่อนของมอนปลา ลองใช้เครื่องมือต่าง ๆ ตอนสู้เพื่อค้นหา','จุดอ่อน');
+      continue;
+    }
     const i=CROPS[k],m=MONSTERS[k],s=G.seen[k];
     await say(i.fact,CROPS[k].name);
     await say(s.known?`แพ้${TOOLS[WEAKNESS[k].normal].el} เพราะ${WEAKNESS[k].reason}`:'ยังไม่รู้จุดอ่อน ลองใช้เครื่องมือต่าง ๆ ตอนสู้เพื่อค้นหา','จุดอ่อน');

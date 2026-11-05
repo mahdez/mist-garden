@@ -6,7 +6,7 @@ const perCrop=v=>Object.fromEntries(CROP_IDS.map(k=>[k,typeof v==='function'?v()
 function newGame(){
   const plots=[];for(let i=0;i<36;i++)plots.push({c:null,g:0,w:false});
   return {day:1,gold:40,shards:0,lv:1,xp:0,hp:40,pw:10,seeds:{...perCrop(0),carrot:6},veg:perCrop(0),
-    stat:{hp:0,pw:0,atk:0,def:0,spd:0,sta:0},golden:0,points:0,stam:30,items:{},equip:{weapon:null,hat:null,shirt:null},fruits:perCrop(0),power:null,tools:{water:1},area:'farm',crater:null,pond:[],fish:{tilapia:0,catfish:0,ruby:0},goldFish:0,plots,land:0,sickle:0,can:0,harvests:0,pity:0,sel:'carrot',
+    stat:{hp:0,pw:0,atk:0,def:0,spd:0,sta:0},golden:0,points:0,stam:30,items:{},equip:{weapon:null,hat:null,shirt:null},fruits:perCrop(0),power:null,tools:{water:1},area:'farm',crater:null,pond:[],fish:{tilapia:0,catfish:0,ruby:0},goldFish:0,fishCaught:0,net:0,plots,land:0,sickle:0,can:0,harvests:0,pity:0,sel:'carrot',
     seen:perCrop(()=>({n:0,rare:0})),x:4,y:5};
 }
 const SAVE='mist-garden-save-v1';
@@ -85,7 +85,7 @@ function normalizeSave(g){
   if(upgraded)g.points=(g.lv-1)*POINTS_PER_LEVEL;
   if(g.stam===undefined)g.stam=30+(g.lv-1)*2;
   g.golden=g.golden||0;
-  g.area=g.area||'farm';g.crater=g.crater||null;g.pond=g.pond||[];g.fish={tilapia:0,catfish:0,ruby:0,...g.fish};g.goldFish=g.goldFish||0;
+  g.area=g.area||'farm';g.crater=g.crater||null;g.pond=g.pond||[];g.fish={tilapia:0,catfish:0,ruby:0,...g.fish};g.goldFish=g.goldFish||0;g.fishCaught=g.fishCaught||0;g.net=g.net||0;
   g.seeds={...perCrop(0),...g.seeds};g.veg={...perCrop(0),...g.veg};g.fruits={...perCrop(0),...g.fruits};g.seen={...perCrop(()=>({n:0,rare:0})),...g.seen};
   g.power=g.power||null;
   g.tools={water:1,...g.tools};
